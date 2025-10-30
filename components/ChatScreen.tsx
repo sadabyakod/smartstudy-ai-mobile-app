@@ -1,3 +1,4 @@
+import { Dimensions, findNodeHandle, Linking } from "react-native";
 import React, { useReducer, useRef, useEffect, useState } from "react";
 import {
   View,
@@ -21,7 +22,7 @@ const API_URL = "https://app-wlanqwy7vuwmu.azurewebsites.net/api/chat";
 const initialMessages = [
   {
     id: "1",
-    text: "👋 Hi! I'm Smarty — your Smart Study AI Assistant. Ask me anything about your studies!",
+    text: "👋 Hi!  I'm Smarty — your Smart Study AI Assistant. Ask me anything about your studies, solve doubts and more... What would you like to learn today?",
     sender: "bot",
     time: new Date().toLocaleTimeString([], {
       hour: "2-digit",
@@ -31,13 +32,49 @@ const initialMessages = [
 ];
 
 export default function ChatScreen() {
+  const [showBotTooltip, setShowBotTooltip] = useState(false);
+  const botTooltipAnim = useRef(new Animated.Value(0)).current;
+  const [tooltipLeft, setTooltipLeft] = useState(0);
+  const botIconRef = useRef(null);
+  const botIconNode = useRef(null);
+
+  const handleBotIconPress = () => {
+    if (botIconNode.current) {
+      const handle = findNodeHandle(botIconNode.current);
+      if (handle) {
+        botIconNode.current.measureInWindow((x, y, width, height) => {
+          const screenWidth = Dimensions.get("window").width;
+          const tooltipWidth = 160;
+          let left = x + width / 2 - tooltipWidth / 2;
+          if (left < 8) left = 8;
+          if (left + tooltipWidth > screenWidth - 8)
+            left = screenWidth - tooltipWidth - 8;
+          setTooltipLeft(left);
+          setShowBotTooltip(true);
+          Animated.timing(botTooltipAnim, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }).start();
+          setTimeout(() => {
+            Animated.timing(botTooltipAnim, {
+              toValue: 0,
+              duration: 250,
+              useNativeDriver: true,
+            }).start(() => setShowBotTooltip(false));
+          }, 1800);
+        });
+      }
+    }
+  };
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const headerAnim = useRef(new Animated.Value(0)).current;
-  const scrollViewRef = useRef();
+  const scrollViewRef = useRef(null);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [inputHeight, setInputHeight] = useState(44);
-
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [messages, dispatch] = useReducer((state, action) => {
     switch (action.type) {
       case "add":
@@ -62,15 +99,19 @@ export default function ChatScreen() {
     }, 200);
   };
 
-  // ✨ Animate header + fade-in initial message
+  useEffect(() => {
+    if (isFirstLoad) {
+      const t = setTimeout(() => setIsFirstLoad(false), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [isFirstLoad]);
+
   useEffect(() => {
     Animated.timing(headerAnim, {
       toValue: 1,
       duration: 700,
       useNativeDriver: true,
     }).start();
-
-    // Fade in initial message on mount
     fadeIn();
     scrollToBottom();
   }, []);
@@ -80,7 +121,7 @@ export default function ChatScreen() {
   }, [messages]);
 
   const handleSend = async (textToSend) => {
-    const finalText = textToSend || input.trim();
+    const finalText = textToSend !== undefined ? textToSend : input.trim();
     if (!finalText) return;
 
     const userMsg = {
@@ -152,7 +193,6 @@ export default function ChatScreen() {
     alert("🎙️ Voice input coming soon!");
   };
 
-  // typing animation dots
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -180,6 +220,96 @@ export default function ChatScreen() {
     animateDot(dot3, 300);
   }, []);
 
+  if (isFirstLoad) {
+    return (
+      <SafeAreaView
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#E0EAFC",
+        }}
+      >
+        <View
+          style={{
+            padding: 32,
+            borderRadius: 24,
+            backgroundColor: "#fff",
+            elevation: 4,
+            shadowColor: "#000",
+            shadowOpacity: 0.08,
+            shadowRadius: 8,
+            alignItems: "center",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 28,
+              fontWeight: "bold",
+              color: "#2563EB",
+              textAlign: "center",
+              marginBottom: 16,
+            }}
+          >
+            👋 Welcome to Your AI Smart Study Assistant
+          </Text>
+          <Text
+            style={{
+              fontSize: 16,
+              color: "#333",
+              textAlign: "center",
+              marginBottom: 18,
+            }}
+          >
+            I’m here to help you with studies, assignments, and more...
+          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 8,
+            }}
+          >
+            <MaterialCommunityIcons
+              name="alpha-n-circle"
+              size={22}
+              color="#2563EB"
+              style={{ marginRight: 6 }}
+            />
+            <Text
+              style={{
+                fontSize: 14,
+                color: "#2563EB",
+                textAlign: "center",
+                fontWeight: "600",
+                marginRight: 4,
+              }}
+            >
+              Powered by Neurozic
+            </Text>
+            <MaterialCommunityIcons
+              name="heart"
+              size={18}
+              color="#FF3366"
+              style={{ marginRight: 6 }}
+            />
+            <Text
+              style={{
+                fontSize: 14,
+                color: "#2563EB",
+                textAlign: "center",
+                fontWeight: "600",
+              }}
+            >
+              Software Solutions Pvt Ltd
+            </Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient colors={["#E0EAFC", "#CFDEF3"]} style={styles.gradient}>
@@ -206,30 +336,76 @@ export default function ChatScreen() {
             ]}
           >
             <LinearGradient
-              colors={["#0066FF", "#00C6FF"]}
+              colors={["#007bff", "#00b4d8"]}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              end={{ x: 1, y: 0 }}
               style={styles.header}
             >
-              <Image
-                source={require("../assets/company-logo.jpeg")}
-                style={styles.logo}
-              />
+              {/* ✅ Clickable Logo */}
+              <TouchableOpacity
+                onPress={() =>
+                  Linking.openURL("https://neurozicsoft.vercel.app/")
+                }
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={require("../assets/company-logo.jpeg")}
+                  style={styles.logo}
+                />
+              </TouchableOpacity>
+
               <View style={styles.headerTextContainer}>
                 <Text style={styles.headerTitle}>My Friend</Text>
                 <Text style={styles.headerSubtitle}>
                   Smart Study AI Assistant
                 </Text>
               </View>
+
+              <TouchableOpacity onPress={handleBotIconPress} activeOpacity={0.7}>
+                <View
+                  style={{ position: "relative", alignItems: "center" }}
+                  ref={(el) => {
+                    botIconRef.current = el;
+                    botIconNode.current = el;
+                  }}
+                >
+                  <Image
+                    source={require("../assets/chat-bot.jpeg")}
+                    style={styles.headerBotLogo}
+                  />
+                  {showBotTooltip && (
+                    <Animated.View
+                      style={[
+                        styles.botTooltip,
+                        {
+                          opacity: botTooltipAnim,
+                          top: -44,
+                          left: tooltipLeft,
+                          transform: [
+                            {
+                              translateY: botTooltipAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [10, -30],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    >
+                      <Text style={styles.botTooltipText}>Ask Smarty 🧠</Text>
+                    </Animated.View>
+                  )}
+                </View>
+              </TouchableOpacity>
             </LinearGradient>
           </Animated.View>
 
-          {/* CHAT */}
+          {/* CHAT AREA */}
           <ScrollView
             ref={scrollViewRef}
             contentContainerStyle={styles.messagesContainer}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
             onContentSizeChange={scrollToBottom}
           >
             {messages.map((item) => (
@@ -261,10 +437,6 @@ export default function ChatScreen() {
                   </View>
                 ) : (
                   <View style={styles.botMessageWrapper}>
-                    <Image
-                      source={require("../assets/chat-bot.jpeg")}
-                      style={styles.chatBotImage}
-                    />
                     <View style={styles.botBubble}>
                       <Text style={styles.botText}>{item.text}</Text>
                       <Text style={styles.timeText}>{item.time}</Text>
@@ -297,30 +469,23 @@ export default function ChatScreen() {
 
           {/* INPUT */}
           <View style={styles.inputWrapper}>
-            <TouchableOpacity onPress={handleMicPress} style={styles.iconBtn}>
-              <MaterialCommunityIcons
-                name="microphone"
-                size={22}
-                color="#2563EB"
-              />
-            </TouchableOpacity>
-
             <TextInput
               style={[styles.input, { height: Math.max(44, inputHeight) }]}
               placeholder="Ask me anything..."
               value={input}
               onChangeText={setInput}
-              onSubmitEditing={() => handleSend()}
+              onSubmitEditing={() => handleSend(input)}
               placeholderTextColor="#9CA3AF"
               multiline
               onContentSizeChange={(e) =>
                 setInputHeight(e.nativeEvent.contentSize.height)
               }
+              onFocus={scrollToBottom}
             />
 
             <TouchableOpacity
               style={[styles.sendBtn, !input.trim() && { opacity: 0.4 }]}
-              onPress={() => handleSend()}
+              onPress={() => handleSend(input)}
               disabled={!input.trim()}
             >
               <Ionicons name="paper-plane" size={20} color="#fff" />
@@ -335,6 +500,32 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
+  botTooltip: {
+    position: "absolute",
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 6,
+    zIndex: 10,
+    maxWidth: 160,
+    alignItems: "center",
+  },
+  botTooltipText: {
+    color: "#2563EB",
+    fontWeight: "600",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  headerBotLogo: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    marginLeft: 10,
+  },
   safeArea: { flex: 1 },
   gradient: { flex: 1 },
   headerWrapper: {
@@ -346,27 +537,34 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    height: 95,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
+    justifyContent: "center",
+    height: 65,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     paddingHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 6,
   },
   logo: { width: 42, height: 42, borderRadius: 12, marginRight: 10 },
   headerTextContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -6,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
     color: "#fff",
+    textAlign: "center",
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#DCEAFE",
-    marginTop: 1,
+    textAlign: "center",
     letterSpacing: 0.3,
   },
   messagesContainer: {
@@ -380,7 +578,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginRight: 6,
   },
-  userMessageWrapper: { alignItems: "flex-end", marginVertical: 6 },
+  userMessageWrapper: { alignItems: "flex-end", marginVertical: 8 },
   botMessageWrapper: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -388,30 +586,38 @@ const styles = StyleSheet.create({
   },
   userBubble: {
     padding: 12,
-    borderRadius: 18,
-    maxWidth: "80%",
-    borderTopRightRadius: 4,
+    borderRadius: 24,
+    maxWidth: "100%",
+    borderTopRightRadius: 16,
+    backgroundColor: "#2563EB",
     shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
   },
   botBubble: {
-    backgroundColor: "#fff",
+    backgroundColor: "#F1F5F9",
     borderWidth: 0.8,
     borderColor: "#E5E7EB",
     padding: 12,
-    borderRadius: 18,
-    borderTopLeftRadius: 4,
+    borderRadius: 24,
+    borderTopLeftRadius: 16,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
-    maxWidth: "80%",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+    maxWidth: "100%",
   },
   userText: { color: "#fff", fontSize: 16 },
   botText: { color: "#333", fontSize: 16 },
-  timeText: { fontSize: 10, color: "#888", marginTop: 4, alignSelf: "flex-end" },
+  timeText: {
+    fontSize: 10,
+    color: "#888",
+    marginTop: 4,
+    alignSelf: "flex-end",
+  },
   typingIndicator: {
     flexDirection: "row",
     alignItems: "center",
@@ -441,11 +647,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FAFB",
     fontSize: 16,
     color: "#333",
-  },
-  iconBtn: {
-    padding: 10,
-    justifyContent: "center",
-    alignItems: "center",
   },
   sendBtn: {
     backgroundColor: "#2563EB",

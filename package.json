@@ -2,6 +2,7 @@
   "dependencies": {
     "expo": "^54.0.21",
     "expo-linear-gradient": "^15.0.7",
+    "expo-updates": "~29.0.12",
     "lottie-react-native": "~7.3.1",
     "react": "^19.1.0",
     "react-native": "^0.81.5",

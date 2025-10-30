@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "1659b73b-2dc5-4061-9c55-1549ab598e0f"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1659b73b-2dc5-4061-9c55-1549ab598e0f"
+    },
+    "android": {
+      "package": "com.sadashivbyakod.smartstudyaichatbot"
+    },
+    "ios": {}
+  }
+}
