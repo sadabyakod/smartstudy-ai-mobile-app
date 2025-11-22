@@ -483,54 +483,18 @@ export default function ChatScreen() {
                 <Text style={styles.headerSubtitle}>
                   Smart Study AI Assistant
                 </Text>
-                {tabContext && (
-                  <TouchableOpacity
-                    onPress={handleGoToExam}
-                    activeOpacity={0.8}
-                    style={styles.examLinkButton}
-                  >
-                    <Ionicons name="school-outline" size={16} color="#fff" />
-                    <Text style={styles.examLinkText}>My Exams</Text>
-                  </TouchableOpacity>
-                )}
               </View>
 
-              <TouchableOpacity onPress={handleBotIconPress} activeOpacity={0.7}>
-                <View
-                  style={{ position: "relative", alignItems: "center" }}
-                  ref={(el) => {
-                    botIconRef.current = el;
-                    botIconNode.current = el;
-                  }}
+              {tabContext && (
+                <TouchableOpacity
+                  onPress={handleGoToExam}
+                  activeOpacity={0.8}
+                  style={styles.examLinkButton}
                 >
-                  <Image
-                    source={require("../assets/chat-bot.jpeg")}
-                    style={styles.headerBotLogo}
-                  />
-                  {showBotTooltip && (
-                    <Animated.View
-                      style={[
-                        styles.botTooltip,
-                        {
-                          opacity: botTooltipAnim,
-                          top: -44,
-                          left: tooltipLeft,
-                          transform: [
-                            {
-                              translateY: botTooltipAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [10, -30],
-                              }),
-                            },
-                          ],
-                        },
-                      ]}
-                    >
-                      <Text style={styles.botTooltipText}>Ask Smarty 🧠</Text>
-                    </Animated.View>
-                  )}
-                </View>
-              </TouchableOpacity>
+                  <Ionicons name="school-outline" size={16} color="#fff" />
+                  <Text style={styles.examLinkText}>My Exams</Text>
+                </TouchableOpacity>
+              )}
             </LinearGradient>
           </Animated.View>
 
@@ -713,6 +677,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    marginLeft: -10,
   },
   headerTitle: {
     fontSize: 22,
@@ -728,14 +693,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   examLinkButton: {
-    marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.18)",
     borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     gap: 6,
+    marginRight: 10,
   },
   examLinkText: {
     color: "#fff",
