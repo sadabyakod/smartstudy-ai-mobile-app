@@ -90,6 +90,7 @@ export default function ChatScreen() {
   const [inputHeight, setInputHeight] = useState(44);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
   type ChatAction =
     | { type: "add"; payload: ChatMessage }
     | { type: "set"; payload: ChatMessage[] };
@@ -165,6 +166,12 @@ export default function ChatScreen() {
   useEffect(() => {
     let isMounted = true;
     const loadHistory = async () => {
+      const timeoutId = setTimeout(() => {
+        if (isMounted) {
+          setIsHistoryLoading(false);
+        }
+      }, 5000);
+
       try {
         const recentSession = await fetchMostRecentSessionId();
         if (!isMounted) return;
@@ -178,6 +185,7 @@ export default function ChatScreen() {
       } catch {
         // no-op
       } finally {
+        clearTimeout(timeoutId);
         if (isMounted) {
           setIsHistoryLoading(false);
         }
@@ -219,6 +227,7 @@ export default function ChatScreen() {
 
     dispatch({ type: "add", payload: userMsg });
     setInput("");
+    setFollowUpQuestion(null);
     Keyboard.dismiss();
     scrollToBottom();
     setIsTyping(true);
@@ -229,6 +238,10 @@ export default function ChatScreen() {
         sessionId,
       });
 
+      // Debug: Log the full response to see what backend returns
+      console.log("API Response:", JSON.stringify(response, null, 2));
+      console.log("Follow-up question:", response?.followUpQuestion);
+
       if (response?.sessionId) {
         setSessionId(response.sessionId);
       }
@@ -237,6 +250,23 @@ export default function ChatScreen() {
         response?.reply ||
         response?.answer ||
         "No response from server.";
+
+      const lowerText = finalText.toLowerCase().trim();
+      const isDisagreement = 
+        lowerText === "no" ||
+        lowerText === "nope" ||
+        lowerText === "disagree" ||
+        lowerText === "i disagree" ||
+        lowerText.startsWith("no ") ||
+        lowerText.startsWith("i don't");
+
+      if (response?.followUpQuestion && !isDisagreement) {
+        console.log("Setting follow-up question:", response.followUpQuestion);
+        setFollowUpQuestion(response.followUpQuestion);
+      } else {
+        console.log("No follow-up question or user disagreed");
+        setFollowUpQuestion(null);
+      }
 
       const botMsg = {
         id: `${Date.now()}-${Math.random()}`,
@@ -284,6 +314,8 @@ export default function ChatScreen() {
   const dot3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (!isTyping) return;
+
     const animateDot = (dot, delay) => {
       Animated.loop(
         Animated.sequence([
@@ -304,7 +336,13 @@ export default function ChatScreen() {
     animateDot(dot1, 0);
     animateDot(dot2, 150);
     animateDot(dot3, 300);
-  }, []);
+
+    return () => {
+      dot1.stopAnimation();
+      dot2.stopAnimation();
+      dot3.stopAnimation();
+    };
+  }, [isTyping, dot1, dot2, dot3]);
 
   if (isFirstLoad) {
     return (
@@ -572,6 +610,23 @@ export default function ChatScreen() {
             )}
           </ScrollView>
 
+          {/* FOLLOW-UP QUESTION CHIP */}
+          {followUpQuestion && (
+            <View style={styles.followUpContainer}>
+              <TouchableOpacity
+                style={styles.followUpChip}
+                onPress={() => {
+                  setFollowUpQuestion(null);
+                  handleSend(followUpQuestion);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.followUpText}>{followUpQuestion}</Text>
+                <Ionicons name="arrow-forward-circle" size={18} color="#2563EB" />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* INPUT */}
           <View style={styles.inputWrapper}>
             <TextInput
@@ -761,6 +816,28 @@ const styles = StyleSheet.create({
   },
   dotContainer: { flexDirection: "row", marginLeft: 6, gap: 4 },
   dot: { width: 6, height: 6, backgroundColor: "#888", borderRadius: 3 },
+  followUpContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#fff",
+  },
+  followUpChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+    alignSelf: "flex-start",
+  },
+  followUpText: {
+    color: "#2563EB",
+    fontSize: 14,
+    fontWeight: "600",
+  },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "flex-end",

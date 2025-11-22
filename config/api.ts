@@ -1,4 +1,6 @@
 export const API_BASE_URL = "https://app-wlanqwy7vuwmu.azurewebsites.net";
+// For local development:
+// export const API_BASE_URL = "http://192.168.1.40:8080";
 
 export const CHAT_ENDPOINTS = {
   send: `${API_BASE_URL}/api/chat`,

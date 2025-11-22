@@ -13,6 +13,7 @@ export interface SendChatResponse {
   timestamp?: string;
   error?: string;
   answer?: string;
+  followUpQuestion?: string;
 }
 
 export interface ChatHistoryItem {
