@@ -1,5 +1,5 @@
 import { Dimensions, findNodeHandle, Linking } from "react-native";
-import React, { useReducer, useRef, useEffect, useState } from "react";
+import React, { useReducer, useRef, useEffect, useState, useContext } from "react";
 import {
   View,
   Text,
@@ -16,8 +16,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-
-const API_URL = "https://app-wlanqwy7vuwmu.azurewebsites.net/api/chat";
+import { CHAT_ENDPOINT } from "../config/api";
+import { TabContext } from "../contexts/TabContext";
 
 const initialMessages = [
   {
@@ -32,6 +32,7 @@ const initialMessages = [
 ];
 
 export default function ChatScreen() {
+  const tabContext = useContext(TabContext);
   const [showBotTooltip, setShowBotTooltip] = useState(false);
   const botTooltipAnim = useRef(new Animated.Value(0)).current;
   const [tooltipLeft, setTooltipLeft] = useState(0);
@@ -141,7 +142,7 @@ export default function ChatScreen() {
     setIsTyping(true);
 
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch(CHAT_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ Question: userMsg.text }),
@@ -191,6 +192,10 @@ export default function ChatScreen() {
 
   const handleMicPress = () => {
     alert("🎙️ Voice input coming soon!");
+  };
+
+  const handleGoToExam = () => {
+    tabContext?.setActiveTab("exam");
   };
 
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -359,6 +364,16 @@ export default function ChatScreen() {
                 <Text style={styles.headerSubtitle}>
                   Smart Study AI Assistant
                 </Text>
+                {tabContext && (
+                  <TouchableOpacity
+                    onPress={handleGoToExam}
+                    activeOpacity={0.8}
+                    style={styles.examLinkButton}
+                  >
+                    <Ionicons name="school-outline" size={16} color="#fff" />
+                    <Text style={styles.examLinkText}>My Exams</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <TouchableOpacity onPress={handleBotIconPress} activeOpacity={0.7}>
@@ -432,7 +447,9 @@ export default function ChatScreen() {
                       style={styles.userBubble}
                     >
                       <Text style={styles.userText}>{item.text}</Text>
-                      <Text style={styles.timeText}>{item.time}</Text>
+                      <Text style={[styles.timeText, styles.userTimeText]}>
+                        {item.time}
+                      </Text>
                     </LinearGradient>
                   </View>
                 ) : (
@@ -567,6 +584,21 @@ const styles = StyleSheet.create({
     textAlign: "center",
     letterSpacing: 0.3,
   },
+  examLinkButton: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    gap: 6,
+  },
+  examLinkText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 13,
+  },
   messagesContainer: {
     flexGrow: 1,
     paddingHorizontal: 12,
@@ -617,6 +649,9 @@ const styles = StyleSheet.create({
     color: "#888",
     marginTop: 4,
     alignSelf: "flex-end",
+  },
+  userTimeText: {
+    color: "#E0ECFF",
   },
   typingIndicator: {
     flexDirection: "row",

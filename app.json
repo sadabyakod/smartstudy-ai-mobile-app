@@ -1,5 +1,8 @@
 {
   "expo": {
+    "name": "SmartStudy AI",
+    "slug": "smartstudyaichatbot",
+    "version": "9",
     "extra": {
       "eas": {
         "projectId": "1659b73b-2dc5-4061-9c55-1549ab598e0f"
@@ -12,7 +15,8 @@
       "url": "https://u.expo.dev/1659b73b-2dc5-4061-9c55-1549ab598e0f"
     },
     "android": {
-      "package": "com.sadashivbyakod.smartstudyaichatbot"
+      "package": "com.sadashivbyakod.smartstudyaichatbot",
+      "versionCode": 9
     },
     "ios": {}
   }
