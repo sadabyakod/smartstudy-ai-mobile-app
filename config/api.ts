@@ -1,6 +1,11 @@
 export const API_BASE_URL = "https://app-wlanqwy7vuwmu.azurewebsites.net";
 
-export const CHAT_ENDPOINT = `${API_BASE_URL}/api/chat`;
+export const CHAT_ENDPOINTS = {
+  send: `${API_BASE_URL}/api/chat`,
+  history: (sessionId: string, limit = 20) =>
+    `${API_BASE_URL}/api/chat/history?sessionId=${encodeURIComponent(sessionId)}&limit=${limit}`,
+  mostRecentSession: `${API_BASE_URL}/api/chat/most-recent-session`,
+} as const;
 
 export const EXAM_ENDPOINTS = {
   createTemplate: `${API_BASE_URL}/api/exam/templates`,

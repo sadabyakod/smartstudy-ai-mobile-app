@@ -1,4 +1,4 @@
-import { Dimensions, findNodeHandle, Linking } from "react-native";
+import { ActivityIndicator, Dimensions, findNodeHandle, Linking } from "react-native";
 import React, { useReducer, useRef, useEffect, useState, useContext } from "react";
 import {
   View,
@@ -16,10 +16,22 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { CHAT_ENDPOINT } from "../config/api";
+import {
+  sendChatMessage,
+  fetchMostRecentSessionId,
+  fetchChatHistory,
+  ChatHistoryItem,
+} from "../services/chatApi";
 import { TabContext } from "../contexts/TabContext";
 
-const initialMessages = [
+type ChatMessage = {
+  id: string;
+  text: string;
+  sender: "user" | "bot";
+  time: string;
+};
+
+const initialMessages: ChatMessage[] = [
   {
     id: "1",
     text: "👋 Hi!  I'm Smarty — your Smart Study AI Assistant. Ask me anything about your studies, solve doubts and more... What would you like to learn today?",
@@ -33,6 +45,7 @@ const initialMessages = [
 
 export default function ChatScreen() {
   const tabContext = useContext(TabContext);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [showBotTooltip, setShowBotTooltip] = useState(false);
   const botTooltipAnim = useRef(new Animated.Value(0)).current;
   const [tooltipLeft, setTooltipLeft] = useState(0);
@@ -76,14 +89,56 @@ export default function ChatScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [inputHeight, setInputHeight] = useState(44);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
-  const [messages, dispatch] = useReducer((state, action) => {
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  type ChatAction =
+    | { type: "add"; payload: ChatMessage }
+    | { type: "set"; payload: ChatMessage[] };
+
+  const [messages, dispatch] = useReducer((state: ChatMessage[], action: ChatAction) => {
     switch (action.type) {
       case "add":
         return [...state, action.payload];
+      case "set":
+        return Array.isArray(action.payload) ? action.payload : state;
       default:
         return state;
     }
   }, initialMessages);
+
+  const formatTimestamp = (value?: string) => {
+    if (!value) {
+      return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+    return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const mapHistoryToMessages = (items: ChatHistoryItem[]): ChatMessage[] => {
+    const mapped: ChatMessage[] = [];
+    items.forEach((entry, index) => {
+      const baseId = entry.id ?? `history-${index}`;
+      if (entry.message) {
+        mapped.push({
+          id: `${baseId}-user`,
+          text: entry.message,
+          sender: "user" as const,
+          time: formatTimestamp(entry.timestamp),
+        });
+      }
+      if (entry.reply) {
+        mapped.push({
+          id: `${baseId}-bot`,
+          text: entry.reply,
+          sender: "bot" as const,
+          time: formatTimestamp(entry.timestamp),
+        });
+      }
+    });
+    return mapped.length ? mapped : [...initialMessages];
+  };
 
   const fadeIn = () => {
     fadeAnim.setValue(0);
@@ -108,6 +163,33 @@ export default function ChatScreen() {
   }, [isFirstLoad]);
 
   useEffect(() => {
+    let isMounted = true;
+    const loadHistory = async () => {
+      try {
+        const recentSession = await fetchMostRecentSessionId();
+        if (!isMounted) return;
+        if (recentSession) {
+          setSessionId(recentSession);
+          const historyItems = await fetchChatHistory(recentSession, 30);
+          if (!isMounted) return;
+          const hydrated = mapHistoryToMessages(historyItems);
+          dispatch({ type: "set", payload: hydrated });
+        }
+      } catch {
+        // no-op
+      } finally {
+        if (isMounted) {
+          setIsHistoryLoading(false);
+        }
+      }
+    };
+    loadHistory();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     Animated.timing(headerAnim, {
       toValue: 1,
       duration: 700,
@@ -128,7 +210,7 @@ export default function ChatScreen() {
     const userMsg = {
       id: `${Date.now()}-${Math.random()}`,
       text: finalText,
-      sender: "user",
+      sender: "user" as const,
       time: new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -142,25 +224,24 @@ export default function ChatScreen() {
     setIsTyping(true);
 
     try {
-      const response = await fetch(CHAT_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ Question: userMsg.text }),
+      const response = await sendChatMessage({
+        question: userMsg.text,
+        sessionId,
       });
 
-      const text = await response.text();
-      let answer = "No response from server.";
-      try {
-        const json = JSON.parse(text);
-        answer = json.reply || json.answer || answer;
-      } catch {
-        answer = text;
+      if (response?.sessionId) {
+        setSessionId(response.sessionId);
       }
+
+      const answer =
+        response?.reply ||
+        response?.answer ||
+        "No response from server.";
 
       const botMsg = {
         id: `${Date.now()}-${Math.random()}`,
         text: answer,
-        sender: "bot",
+        sender: "bot" as const,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
@@ -178,7 +259,7 @@ export default function ChatScreen() {
       const errorMsg = {
         id: `${Date.now()}-${Math.random()}`,
         text: "⚠️ Connection error. Please try again.",
-        sender: "bot",
+        sender: "bot" as const,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
@@ -423,6 +504,13 @@ export default function ChatScreen() {
             keyboardShouldPersistTaps="always"
             onContentSizeChange={scrollToBottom}
           >
+            {isHistoryLoading && (
+              <View style={styles.historyLoader}>
+                <ActivityIndicator size="small" color="#2563EB" />
+                <Text style={styles.historyLoaderText}>Loading previous messages…</Text>
+              </View>
+            )}
+
             {messages.map((item) => (
               <Animated.View
                 key={item.id}
@@ -598,6 +686,18 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     fontSize: 13,
+  },
+  historyLoader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+  },
+  historyLoaderText: {
+    marginLeft: 8,
+    color: "#2563EB",
+    fontSize: 13,
+    fontWeight: "600",
   },
   messagesContainer: {
     flexGrow: 1,
