@@ -22,7 +22,7 @@ import {
   fetchChatHistory,
   ChatHistoryItem,
 } from "../services/chatApi";
-import { TabContext } from "../contexts/TabContext";
+import { NavigationContext } from "../navigation/NavigationContext";
 
 type ChatMessage = {
   id: string;
@@ -44,7 +44,7 @@ const initialMessages: ChatMessage[] = [
 ];
 
 export default function ChatScreen() {
-  const tabContext = useContext(TabContext);
+  const { navigate } = useContext(NavigationContext);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showBotTooltip, setShowBotTooltip] = useState(false);
   const botTooltipAnim = useRef(new Animated.Value(0)).current;
@@ -305,10 +305,6 @@ export default function ChatScreen() {
     alert("🎙️ Voice input coming soon!");
   };
 
-  const handleGoToExam = () => {
-    tabContext?.setActiveTab("exam");
-  };
-
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -485,16 +481,15 @@ export default function ChatScreen() {
                 </Text>
               </View>
 
-              {tabContext && (
-                <TouchableOpacity
-                  onPress={handleGoToExam}
-                  activeOpacity={0.8}
-                  style={styles.examLinkButton}
-                >
-                  <Ionicons name="school-outline" size={16} color="#fff" />
-                  <Text style={styles.examLinkText}>My Exams</Text>
-                </TouchableOpacity>
-              )}
+              {/* Exam Navigation Button */}
+              <TouchableOpacity
+                style={styles.examButton}
+                onPress={() => navigate("exam")}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="document-text" size={20} color="#fff" />
+                <Text style={styles.examButtonText}>My Exams</Text>
+              </TouchableOpacity>
             </LinearGradient>
           </Animated.View>
 
@@ -691,6 +686,22 @@ const styles = StyleSheet.create({
     color: "#DCEAFE",
     textAlign: "center",
     letterSpacing: 0.3,
+  },
+  examButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  examButtonText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+    marginLeft: 4,
   },
   examLinkButton: {
     flexDirection: "row",
