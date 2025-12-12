@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../config/api";
+import { API_BASE_URL, getUserFriendlyErrorMessage, fetchWithTimeout, ERROR_MESSAGES } from "../config/api";
 
 // Types for Template-based Exam Flow
 export interface GenerateModelPaperRequest {
@@ -121,10 +121,8 @@ export async function createExamTemplate(
       durationMinutes: request.questionCount * 2,
       adaptiveEnabled: true,
     };
-    
-    console.log("Creating template:", templatePayload);
-    
-    const response = await fetch(`${API_BASE_URL}/api/exams/templates`, {
+
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/exams/templates`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
@@ -132,21 +130,16 @@ export async function createExamTemplate(
       body: JSON.stringify(templatePayload),
     });
 
-    console.log("Template response status:", response.status);
-    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Template creation error:", errorText);
-      throw new Error(`Failed to create template: ${response.status} - ${errorText}`);
+      if (response.status >= 500) {
+        throw new Error(ERROR_MESSAGES.SERVER_ERROR);
+      }
+      throw new Error(ERROR_MESSAGES.UNKNOWN_ERROR);
     }
 
-    const template = await response.json();
-    console.log("Template created:", template);
-    
-    return template;
+    return await response.json();
   } catch (error) {
-    console.error("Create template error:", error);
-    throw error;
+    throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
 
@@ -160,10 +153,8 @@ export async function startExam(
       studentId,
       examTemplateId: templateId,
     };
-    
-    console.log("Starting exam:", startPayload);
-    
-    const response = await fetch(`${API_BASE_URL}/api/exams/start`, {
+
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/exams/start`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
@@ -171,21 +162,16 @@ export async function startExam(
       body: JSON.stringify(startPayload),
     });
 
-    console.log("Start exam response status:", response.status);
-    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Start exam error:", errorText);
-      throw new Error(`Failed to start exam: ${response.status} - ${errorText}`);
+      if (response.status >= 500) {
+        throw new Error(ERROR_MESSAGES.SERVER_ERROR);
+      }
+      throw new Error(ERROR_MESSAGES.UNKNOWN_ERROR);
     }
 
-    const examData = await response.json();
-    console.log("Exam started:", examData);
-    
-    return examData;
+    return await response.json();
   } catch (error) {
-    console.error("Start exam error:", error);
-    throw error;
+    throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
 
@@ -202,10 +188,8 @@ export async function submitAnswer(
       selectedOptionId,
       timeTakenSeconds,
     };
-    
-    console.log("Submitting answer:", answerPayload);
-    
-    const response = await fetch(`${API_BASE_URL}/api/exams/${attemptId}/answer`, {
+
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/exams/${attemptId}/answer`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
@@ -213,51 +197,39 @@ export async function submitAnswer(
       body: JSON.stringify(answerPayload),
     });
 
-    console.log("Submit answer response status:", response.status);
-    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Submit answer error:", errorText);
-      throw new Error(`Failed to submit answer: ${response.status} - ${errorText}`);
+      if (response.status >= 500) {
+        throw new Error(ERROR_MESSAGES.SERVER_ERROR);
+      }
+      throw new Error(ERROR_MESSAGES.UNKNOWN_ERROR);
     }
 
-    const result = await response.json();
-    console.log("Answer result:", result);
-    
-    return result;
+    return await response.json();
   } catch (error) {
-    console.error("Submit answer error:", error);
-    throw error;
+    throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
 
 // Step 4: Get exam summary
 export async function getExamSummary(attemptId: number): Promise<ExamSummary> {
   try {
-    console.log("Getting exam summary for attemptId:", attemptId);
-    
-    const response = await fetch(`${API_BASE_URL}/api/exams/${attemptId}/summary`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/exams/${attemptId}/summary`, {
       method: "GET",
       headers: { 
         "Content-Type": "application/json",
       },
     });
 
-    console.log("Summary response status:", response.status);
-    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Get summary error:", errorText);
-      throw new Error(`Failed to get summary: ${response.status} - ${errorText}`);
+      if (response.status >= 500) {
+        throw new Error(ERROR_MESSAGES.SERVER_ERROR);
+      }
+      throw new Error(ERROR_MESSAGES.UNKNOWN_ERROR);
     }
 
-    const summary = await response.json();
-    console.log("Exam summary:", summary);
-    
-    return summary;
+    return await response.json();
   } catch (error) {
-    console.error("Get summary error:", error);
-    throw error;
+    throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
 
@@ -280,9 +252,7 @@ export async function getExamHistory(
   studentId: string = "model-paper-student"
 ): Promise<ExamHistory[]> {
   try {
-    console.log("Getting exam history for studentId:", studentId);
-    
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${API_BASE_URL}/api/exams/history?studentId=${encodeURIComponent(studentId)}`,
       {
         method: "GET",
@@ -292,20 +262,17 @@ export async function getExamHistory(
       }
     );
 
-    console.log("History response status:", response.status);
-    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Get history error:", errorText);
-      throw new Error(`Failed to get history: ${response.status} - ${errorText}`);
+      if (response.status >= 500) {
+        throw new Error(ERROR_MESSAGES.SERVER_ERROR);
+      }
+      return []; // Return empty array for non-server errors
     }
 
     const history = await response.json();
-    console.log("Exam history:", history);
-    
     return history;
   } catch (error) {
     console.error("Get history error:", error);
-    throw error;
+    throw new Error(getUserFriendlyErrorMessage(error));
   }
 }

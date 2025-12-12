@@ -1,4 +1,4 @@
-import { CHAT_ENDPOINTS } from "../config/api";
+import { CHAT_ENDPOINTS, getUserFriendlyErrorMessage, fetchWithTimeout, ERROR_MESSAGES } from "../config/api";
 
 export interface SendChatRequest {
   question: string;
@@ -38,30 +38,38 @@ export interface MostRecentSessionResponse {
 export async function sendChatMessage(
   payload: SendChatRequest
 ): Promise<SendChatResponse> {
-  const response = await fetch(CHAT_ENDPOINTS.send, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      question: payload.question,
-      sessionId: payload.sessionId ?? undefined,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to send chat message (${response.status})`);
-  }
-
-  const raw = await response.text();
   try {
-    return JSON.parse(raw);
-  } catch {
-    return { reply: raw };
+    const response = await fetchWithTimeout(CHAT_ENDPOINTS.send, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: payload.question,
+        sessionId: payload.sessionId ?? undefined,
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status >= 500) {
+        return { reply: ERROR_MESSAGES.SERVER_ERROR, error: "server_error" };
+      }
+      return { reply: ERROR_MESSAGES.UNKNOWN_ERROR, error: "request_failed" };
+    }
+
+    const raw = await response.text();
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { reply: raw };
+    }
+  } catch (error) {
+    console.error("Chat API error:", error);
+    return { reply: getUserFriendlyErrorMessage(error), error: "connection_error" };
   }
 }
 
 export async function fetchMostRecentSessionId(): Promise<string | null> {
   try {
-    const response = await fetch(CHAT_ENDPOINTS.mostRecentSession);
+    const response = await fetchWithTimeout(CHAT_ENDPOINTS.mostRecentSession, {}, 10000);
     if (!response.ok) {
       return null;
     }
@@ -70,7 +78,8 @@ export async function fetchMostRecentSessionId(): Promise<string | null> {
       return data.sessionId;
     }
     return data?.sessionId ?? null;
-  } catch {
+  } catch (error) {
+    console.error("Failed to fetch recent session:", error);
     return null;
   }
 }
@@ -79,13 +88,19 @@ export async function fetchChatHistory(
   sessionId: string,
   limit = 20
 ): Promise<ChatHistoryItem[]> {
-  const response = await fetch(CHAT_ENDPOINTS.history(sessionId, limit));
-  if (!response.ok) {
-    throw new Error(`Failed to fetch chat history (${response.status})`);
+  try {
+    const response = await fetchWithTimeout(CHAT_ENDPOINTS.history(sessionId, limit), {}, 15000);
+    if (!response.ok) {
+      console.error("Failed to fetch chat history:", response.status);
+      return [];
+    }
+    const data: ChatHistoryResponse = await response.json();
+    if (Array.isArray(data?.messages)) {
+      return data.messages;
+    }
+    return [];
+  } catch (error) {
+    console.error("Chat history fetch error:", error);
+    return [];
   }
-  const data: ChatHistoryResponse = await response.json();
-  if (Array.isArray(data?.messages)) {
-    return data.messages;
-  }
-  return [];
 }

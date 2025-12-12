@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../config/api";
+import { API_BASE_URL, getUserFriendlyErrorMessage, fetchWithTimeout as baseFetchWithTimeout, ERROR_MESSAGES } from "../config/api";
 
 // Types for Karnataka 2nd PUC Exam Generator
 
@@ -81,6 +81,26 @@ export interface WrittenSubmissionResult {
   writtenSubmissionId: string;
   status: "PendingEvaluation" | "Completed" | "Failed";
   message: string;
+}
+
+// Submission status polling types
+export type SubmissionStatus = 
+  | "PendingEvaluation" 
+  | "OcrProcessing" 
+  | "Evaluating" 
+  | "Completed" 
+  | "Failed";
+
+export interface SubmissionStatusResponse {
+  writtenSubmissionId: string;
+  status: SubmissionStatus;
+  statusMessage: string;
+  submittedAt: string;
+  evaluatedAt: string | null;
+  isComplete: boolean;
+  examId: string;
+  studentId: string;
+  result: ExamResult | null;
 }
 
 export interface McqQuestionResult {
@@ -181,6 +201,7 @@ export class ApiError extends Error {
   public statusCode: number;
   public isNetworkError: boolean;
   public isTimeout: boolean;
+  public userMessage: string;
   
   constructor(message: string, statusCode: number = 0, isNetworkError: boolean = false, isTimeout: boolean = false) {
     super(message);
@@ -188,25 +209,26 @@ export class ApiError extends Error {
     this.statusCode = statusCode;
     this.isNetworkError = isNetworkError;
     this.isTimeout = isTimeout;
+    // Provide user-friendly message based on error type
+    if (isNetworkError) {
+      this.userMessage = ERROR_MESSAGES.NETWORK_ERROR;
+    } else if (isTimeout) {
+      this.userMessage = ERROR_MESSAGES.TIMEOUT_ERROR;
+    } else if (statusCode >= 500) {
+      this.userMessage = ERROR_MESSAGES.SERVER_ERROR;
+    } else {
+      this.userMessage = message;
+    }
   }
 }
 
-// Helper to create fetch with timeout
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 30000): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  
+// Helper to create fetch with timeout - uses centralized fetchWithTimeout from api.ts
+async function pucFetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 30000): Promise<Response> {
   try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
+    return await baseFetchWithTimeout(url, options, timeoutMs);
   } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new ApiError('Request timed out. Please check your internet connection and try again.', 0, false, true);
+    if (error.message?.includes('timeout') || error.message?.includes('aborted')) {
+      throw new ApiError(ERROR_MESSAGES.TIMEOUT_ERROR, 0, false, true);
     }
     throw error;
   }
@@ -220,9 +242,7 @@ export async function generatePUCExam(
   request: GenerateExamRequest
 ): Promise<GeneratedExam> {
   try {
-    console.log("Generating PUC Exam:", request);
-    
-    const response = await fetchWithTimeout(
+    const response = await pucFetchWithTimeout(
       `${API_BASE_URL}/api/exam/generate`,
       {
         method: "POST",
@@ -234,41 +254,23 @@ export async function generatePUCExam(
       120000 // 2 minutes timeout for exam generation (AI takes time)
     );
 
-    console.log("Generate exam response status:", response.status);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Generate exam error:", errorText);
-      throw new ApiError(
-        `Server error (${response.status}). Please try again later.`,
-        response.status
-      );
+      throw new ApiError(ERROR_MESSAGES.SERVER_ERROR, response.status);
     }
 
-    const exam = await response.json();
-    console.log("Exam generated:", exam.examId);
-    
-    return exam;
+    return await response.json();
   } catch (error: any) {
-    console.error("Generate PUC exam error:", error);
-    
-    // Already an ApiError, re-throw
     if (error instanceof ApiError) {
       throw error;
     }
     
-    // Network error (no internet, server down, etc.)
     if (error.message?.includes('Network request failed') || 
         error.message?.includes('Failed to fetch') ||
         error.message?.includes('Unable to resolve host')) {
-      throw new ApiError(
-        'Cannot connect to server. Please check:\n• Your internet connection\n• That you are on the same WiFi network as the server\n• The server is running',
-        0,
-        true
-      );
+      throw new ApiError(ERROR_MESSAGES.NETWORK_ERROR, 0, true);
     }
     
-    throw new ApiError(error.message || 'Unknown error occurred. Please try again.');
+    throw new ApiError(getUserFriendlyErrorMessage(error));
   }
 }
 
@@ -303,8 +305,6 @@ export async function submitExamAnswers(
   answers: AnswerSubmission[]
 ): Promise<ExamSubmissionResult> {
   try {
-    console.log("Submitting exam answers:", examId, answers.length, "answers");
-    
     const formData = new FormData();
     formData.append("examId", examId);
     
@@ -321,7 +321,6 @@ export async function submitExamAnswers(
       }
       
       if (answer.imageUri) {
-        // Create file object from URI for React Native
         const filename = answer.imageUri.split('/').pop() || `answer_${answer.questionId}.jpg`;
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : 'image/jpeg';
@@ -334,27 +333,21 @@ export async function submitExamAnswers(
       }
     }
     
-    const response = await fetch(`${API_BASE_URL}/api/exam/submit`, {
+    const response = await pucFetchWithTimeout(`${API_BASE_URL}/api/exam/submit`, {
       method: "POST",
       body: formData,
-      // Don't set Content-Type header - let fetch set it with boundary for multipart
-    });
-
-    console.log("Submit exam response status:", response.status);
+    }, 60000);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Submit exam error:", errorText);
-      throw new Error(`Failed to submit exam: ${response.status} - ${errorText}`);
+      throw new ApiError(ERROR_MESSAGES.SERVER_ERROR, response.status);
     }
 
-    const result = await response.json();
-    console.log("Exam evaluated:", result.examId, "Score:", result.totalScore);
-    
-    return result;
+    return await response.json();
   } catch (error) {
-    console.error("Submit exam error:", error);
-    throw error;
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(getUserFriendlyErrorMessage(error));
   }
 }
 
@@ -402,9 +395,7 @@ export async function submitMcqAnswers(
   answers: McqAnswer[]
 ): Promise<McqSubmissionResult> {
   try {
-    console.log("Submitting MCQ answers:", examId, answers.length, "answers");
-    
-    const response = await fetchWithTimeout(
+    const response = await pucFetchWithTimeout(
       `${API_BASE_URL}/api/exam/submit-mcq`,
       {
         method: "POST",
@@ -417,41 +408,21 @@ export async function submitMcqAnswers(
           answers,
         }),
       },
-      30000 // 30 seconds timeout
+      30000
     );
 
-    console.log("Submit MCQ response status:", response.status);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Submit MCQ error:", errorText);
-      throw new ApiError(
-        `Failed to submit MCQ answers (${response.status}). Please try again.`,
-        response.status
-      );
+      throw new ApiError(ERROR_MESSAGES.SERVER_ERROR, response.status);
     }
 
-    const result = await response.json();
-    console.log("MCQ evaluated:", result.mcqSubmissionId, "Score:", result.score);
-    
-    return result;
+    return await response.json();
   } catch (error: any) {
-    console.error("Submit MCQ error:", error);
-    
     if (error instanceof ApiError) {
       throw error;
     }
     
-    if (error.message?.includes('Network request failed') || 
-        error.message?.includes('Failed to fetch')) {
-      throw new ApiError(
-        'Cannot connect to server. Please check your internet connection.',
-        0,
-        true
-      );
-    }
-    
-    throw new ApiError(error.message || 'Failed to submit MCQ answers. Please try again.');
+    throw new ApiError(getUserFriendlyErrorMessage(error), 0, 
+      error.message?.includes('Network') || error.message?.includes('fetch'));
   }
 }
 
@@ -465,8 +436,6 @@ export async function uploadWrittenAnswers(
   imageUris: string[]
 ): Promise<WrittenSubmissionResult> {
   try {
-    console.log("Uploading written answers:", examId, imageUris.length, "images");
-    
     const formData = new FormData();
     formData.append("examId", examId);
     formData.append("studentId", studentId);
@@ -474,15 +443,12 @@ export async function uploadWrittenAnswers(
     for (let i = 0; i < imageUris.length; i++) {
       const uri = imageUris[i];
       
-      // Check if running in web environment (blob: or data: URI)
       if (uri.startsWith('blob:') || uri.startsWith('data:')) {
-        // Web environment: fetch the blob and append as file
         const response = await fetch(uri);
         const blob = await response.blob();
         const filename = `written_answer_${i}.jpg`;
         formData.append("files", blob, filename);
       } else {
-        // React Native environment: use uri/name/type object
         const filename = uri.split('/').pop() || `written_answer_${i}.jpg`;
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : 'image/jpeg';
@@ -495,24 +461,17 @@ export async function uploadWrittenAnswers(
       }
     }
     
-    const response = await fetchWithTimeout(
+    const response = await pucFetchWithTimeout(
       `${API_BASE_URL}/api/exam/upload-written`,
       {
         method: "POST",
         body: formData,
       },
-      60000 // 60 seconds timeout for image upload
+      60000
     );
 
-    console.log("Upload written response status:", response.status);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Upload written error:", errorText);
-      throw new ApiError(
-        `Failed to upload answer sheets (${response.status}). Please try again.`,
-        response.status
-      );
+      throw new ApiError(ERROR_MESSAGES.SERVER_ERROR, response.status);
     }
 
     const result = await response.json();
@@ -520,22 +479,12 @@ export async function uploadWrittenAnswers(
     
     return result;
   } catch (error: any) {
-    console.error("Upload written error:", error);
-    
     if (error instanceof ApiError) {
       throw error;
     }
     
-    if (error.message?.includes('Network request failed') || 
-        error.message?.includes('Failed to fetch')) {
-      throw new ApiError(
-        'Cannot connect to server. Please check your internet connection.',
-        0,
-        true
-      );
-    }
-    
-    throw new ApiError(error.message || 'Failed to upload answer sheets. Please try again.');
+    throw new ApiError(getUserFriendlyErrorMessage(error), 0,
+      error.message?.includes('Network') || error.message?.includes('fetch'));
   }
 }
 
@@ -547,9 +496,7 @@ export async function getExamResults(
   studentId: string
 ): Promise<ExamResult> {
   try {
-    console.log("Getting exam results:", examId, studentId);
-    
-    const response = await fetchWithTimeout(
+    const response = await pucFetchWithTimeout(
       `${API_BASE_URL}/api/exam/result/${examId}/${studentId}`,
       {
         method: "GET",
@@ -557,42 +504,129 @@ export async function getExamResults(
           "Content-Type": "application/json",
         },
       },
-      30000 // 30 seconds timeout
+      30000
     );
 
-    console.log("Get results response status:", response.status);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Get results error:", errorText);
       throw new ApiError(
-        `Failed to get exam results (${response.status}). Results may not be ready yet.`,
+        "Results are not available yet. Please wait a moment and try again.",
         response.status
       );
     }
 
-    const result = await response.json();
-    console.log("Results retrieved:", result.examId, "Grade:", result.grade);
-    
-    return result;
+    return await response.json();
   } catch (error: any) {
-    console.error("Get results error:", error);
-    
     if (error instanceof ApiError) {
       throw error;
     }
     
-    if (error.message?.includes('Network request failed') || 
-        error.message?.includes('Failed to fetch')) {
-      throw new ApiError(
-        'Cannot connect to server. Please check your internet connection.',
-        0,
-        true
-      );
+    throw new ApiError(getUserFriendlyErrorMessage(error), 0,
+      error.message?.includes('Network') || error.message?.includes('fetch'));
+  }
+}
+
+/**
+ * Check the status of a written submission evaluation
+ * Use this to poll for evaluation progress and get results when complete
+ * 
+ * @param writtenSubmissionId The ID returned when answer sheet was uploaded
+ * @returns Status information, includes full results when isComplete is true
+ */
+export async function checkSubmissionStatus(
+  writtenSubmissionId: string
+): Promise<SubmissionStatusResponse> {
+  try {
+    const response = await pucFetchWithTimeout(
+      `${API_BASE_URL}/api/exam/submission-status/${writtenSubmissionId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+      30000
+    );
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new ApiError(
+          'Submission not found. Please check and try again.',
+          404
+        );
+      }
+      throw new ApiError(ERROR_MESSAGES.SERVER_ERROR, response.status);
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      throw error;
     }
     
-    throw new ApiError(error.message || 'Failed to get exam results. Please try again.');
+    throw new ApiError(getUserFriendlyErrorMessage(error), 0,
+      error.message?.includes('Network') || error.message?.includes('fetch'));
   }
+}
+
+/**
+ * Poll for submission status until evaluation is complete
+ * Automatically checks every 5 seconds for up to 10 minutes
+ * 
+ * @param writtenSubmissionId The ID returned when answer sheet was uploaded
+ * @param onStatusUpdate Callback function called on each status update
+ * @param pollInterval Interval in milliseconds (default: 5000 = 5 seconds)
+ * @param maxAttempts Maximum number of polling attempts (default: 120 = 10 minutes)
+ * @returns Promise that resolves when evaluation is complete with full results
+ */
+export async function pollSubmissionStatus(
+  writtenSubmissionId: string,
+  onStatusUpdate: (status: SubmissionStatusResponse) => void,
+  pollInterval: number = 5000,
+  maxAttempts: number = 120
+): Promise<SubmissionStatusResponse> {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    
+    const poll = async () => {
+      try {
+        attempts++;
+        
+        const statusData = await checkSubmissionStatus(writtenSubmissionId);
+        
+        // Call the status update callback
+        onStatusUpdate(statusData);
+        
+        // Check if evaluation is complete
+        if (statusData.isComplete) {
+          clearInterval(pollIntervalId);
+          resolve(statusData);
+          return;
+        }
+        
+        // Check if max attempts reached
+        if (attempts >= maxAttempts) {
+          clearInterval(pollIntervalId);
+          reject(new ApiError(
+            'Evaluation is taking longer than expected. Please check back later.',
+            0,
+            false,
+            true
+          ));
+          return;
+        }
+        
+      } catch (error) {
+        clearInterval(pollIntervalId);
+        reject(error);
+      }
+    };
+    
+    // Start polling immediately
+    poll();
+    
+    // Then poll at regular intervals
+    const pollIntervalId = setInterval(poll, pollInterval);
+  });
 }
 
 /**

@@ -1,4 +1,4 @@
-import { EXAM_ENDPOINTS } from "../config/api";
+import { EXAM_ENDPOINTS, getUserFriendlyErrorMessage, fetchWithTimeout, ERROR_MESSAGES } from "../config/api";
 
 export type QuestionType = "MultipleChoice" | "TrueFalse" | "ShortAnswer";
 export type QuestionDifficulty = "Easy" | "Medium" | "Hard";
@@ -119,10 +119,12 @@ export interface ExamHistoryEntry {
 
 class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  userMessage: string;
+  constructor(status: number, message: string, userMessage?: string) {
     super(message);
     this.status = status;
     this.name = "ApiError";
+    this.userMessage = userMessage || getUserFriendlyErrorMessage(new Error(message));
   }
 }
 
@@ -135,7 +137,7 @@ async function parseJson<T>(response: Response): Promise<T> {
   try {
     return JSON.parse(raw) as T;
   } catch (error) {
-    throw new ApiError(response.status, `Failed to parse JSON: ${raw}`);
+    throw new ApiError(response.status, `Failed to parse JSON: ${raw}`, ERROR_MESSAGES.SERVER_ERROR);
   }
 }
 
@@ -148,29 +150,47 @@ async function request<T>(
     ...(options.headers ?? {}),
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetchWithTimeout(url, {
+      ...options,
+      headers,
+    });
 
-  if (!response.ok) {
-    let message = response.statusText || "Request failed";
-    try {
-      const body = await parseJson<{ message?: string; error?: string }>(
-        response
-      );
-      message = body?.message || body?.error || message;
-    } catch {
-      // Body was not JSON, keep default message.
+    if (!response.ok) {
+      let message = response.statusText || "Request failed";
+      let userMessage = ERROR_MESSAGES.UNKNOWN_ERROR;
+      
+      if (response.status >= 500) {
+        userMessage = ERROR_MESSAGES.SERVER_ERROR;
+      } else if (response.status === 404) {
+        userMessage = "The requested resource was not found. Please try again.";
+      } else if (response.status === 401 || response.status === 403) {
+        userMessage = "You don't have permission to access this resource.";
+      }
+      
+      try {
+        const body = await parseJson<{ message?: string; error?: string }>(
+          response
+        );
+        message = body?.message || body?.error || message;
+      } catch {
+        // Body was not JSON, keep default message.
+      }
+      throw new ApiError(response.status, message, userMessage);
     }
-    throw new ApiError(response.status, message);
-  }
 
-  if (response.status === 204) {
-    return {} as T;
-  }
+    if (response.status === 204) {
+      return {} as T;
+    }
 
-  return parseJson<T>(response);
+    return parseJson<T>(response);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    console.error("Exam API request error:", error);
+    throw new ApiError(0, String(error), getUserFriendlyErrorMessage(error));
+  }
 }
 
 export async function createExamTemplate(
