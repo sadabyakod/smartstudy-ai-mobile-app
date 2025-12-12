@@ -34,7 +34,7 @@ type ChatMessage = {
 const initialMessages: ChatMessage[] = [
   {
     id: "1",
-    text: "👋 Hi!  I'm Smarty — your Smart Study AI Assistant. Ask me anything about your studies, solve doubts and more... What would you like to learn today?",
+    text: "Welcome to your Study Dashboard! Select a subject below to begin your learning journey.",
     sender: "bot",
     time: new Date().toLocaleTimeString([], {
       hour: "2-digit",
@@ -238,10 +238,6 @@ export default function ChatScreen() {
         sessionId,
       });
 
-      // Debug: Log the full response to see what backend returns
-      console.log("API Response:", JSON.stringify(response, null, 2));
-      console.log("Follow-up question:", response?.followUpQuestion);
-
       if (response?.sessionId) {
         setSessionId(response.sessionId);
       }
@@ -261,10 +257,8 @@ export default function ChatScreen() {
         lowerText.startsWith("i don't");
 
       if (response?.followUpQuestion && !isDisagreement) {
-        console.log("Setting follow-up question:", response.followUpQuestion);
         setFollowUpQuestion(response.followUpQuestion);
       } else {
-        console.log("No follow-up question or user disagreed");
         setFollowUpQuestion(null);
       }
 
@@ -288,7 +282,7 @@ export default function ChatScreen() {
       setIsTyping(false);
       const errorMsg = {
         id: `${Date.now()}-${Math.random()}`,
-        text: "⚠️ Connection error. Please try again.",
+        text: "😔 Oops! We couldn't connect to our servers right now.\n\nPlease check your internet connection and try again. If the problem persists, our team is working on it!",
         sender: "bot" as const,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
@@ -371,7 +365,7 @@ export default function ChatScreen() {
               marginBottom: 16,
             }}
           >
-            👋 Welcome to Your AI Smart Study Assistant
+            Welcome to Study Assistant
           </Text>
           <Text
             style={{
@@ -475,20 +469,20 @@ export default function ChatScreen() {
               </TouchableOpacity>
 
               <View style={styles.headerTextContainer}>
-                <Text style={styles.headerTitle}>My Friend</Text>
+                <Text style={styles.headerTitle}>Study Dashboard</Text>
                 <Text style={styles.headerSubtitle}>
-                  Smart Study AI Assistant
+                  Learning Support
                 </Text>
               </View>
 
-              {/* Exam Navigation Button */}
+              {/* Back to Dashboard Button */}
               <TouchableOpacity
                 style={styles.examButton}
-                onPress={() => navigate("exam")}
+                onPress={() => navigate("home")}
                 activeOpacity={0.8}
               >
-                <Ionicons name="document-text" size={20} color="#fff" />
-                <Text style={styles.examButtonText}>My Exams</Text>
+                <Ionicons name="home" size={20} color="#fff" />
+                <Text style={styles.examButtonText}>Dashboard</Text>
               </TouchableOpacity>
             </LinearGradient>
           </Animated.View>
@@ -550,10 +544,7 @@ export default function ChatScreen() {
 
             {isTyping && (
               <View style={styles.typingIndicator}>
-                <Image
-                  source={require("../assets/chat-bot.jpeg")}
-                  style={styles.chatBotImage}
-                />
+                <Ionicons name="book" size={32} color="#2563EB" style={{ marginRight: 8 }} />
                 <View style={styles.dotContainer}>
                   <Animated.View
                     style={[styles.dot, { transform: [{ translateY: dot1 }] }]}
@@ -590,7 +581,7 @@ export default function ChatScreen() {
           <View style={styles.inputWrapper}>
             <TextInput
               style={[styles.input, { height: Math.max(44, inputHeight) }]}
-              placeholder="Ask me anything..."
+              placeholder="Type your question here..."
               value={input}
               onChangeText={setInput}
               onSubmitEditing={() => handleSend(input)}

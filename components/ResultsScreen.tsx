@@ -17,7 +17,11 @@ interface ResultsScreenProps {
   onBack: () => void;
 }
 
-export default function ResultsScreen({ examId, studentId, onBack }: ResultsScreenProps) {
+export default function ResultsScreen({ 
+  examId, 
+  studentId, 
+  onBack
+}: ResultsScreenProps) {
   const [results, setResults] = useState<ExamResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +37,8 @@ export default function ResultsScreen({ examId, studentId, onBack }: ResultsScre
       const data = await getExamResults(examId, studentId);
       setResults(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load results');
-      Alert.alert('Error', err.message || 'Failed to load results');
+      setError(err.userMessage || err.message || 'Failed to load results');
+      Alert.alert('Error', err.userMessage || err.message || 'Failed to load results');
     } finally {
       setLoading(false);
     }

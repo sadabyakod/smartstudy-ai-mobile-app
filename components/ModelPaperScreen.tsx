@@ -45,7 +45,6 @@ export default function ModelPaperScreen() {
       
       // Step 1: Generate random request
       const request = generateRandomModelPaperRequest();
-      console.log("Generated request:", request);
       
       // Step 2: Create template
       const templateResult = await createExamTemplate(request);

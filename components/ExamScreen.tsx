@@ -239,10 +239,10 @@ export default function ExamScreen() {
         {tabContext && (
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => tabContext.setActiveTab("chat")}
+            onPress={() => tabContext.setActiveTab("home")}
             activeOpacity={0.85}
           >
-            <Text style={styles.backButtonText}>← Back to Chat Assistant</Text>
+            <Text style={styles.backButtonText}>← Back to Dashboard</Text>
           </TouchableOpacity>
         )}
 

@@ -35,11 +35,14 @@ import {
   hasSubParts,
   getGradeColor,
   getGradeDescription,
+  pollSubmissionStatus,
+  checkSubmissionStatus,
+  SubmissionStatusResponse,
 } from "../services/pucExamApi";
 import { API_BASE_URL } from "../config/api";
 import { NavigationContext } from "../navigation/NavigationContext";
 
-type ScreenState = "initial" | "loading" | "exam" | "question" | "questionPaper" | "uploadAnswers" | "submitting" | "results";
+type ScreenState = "initial" | "loading" | "exam" | "question" | "questionPaper" | "uploadAnswers" | "submitting" | "results" | "evaluating";
 type AnswerMode = "type" | "upload";
 
 // Helper component for MCQ result item
@@ -138,6 +141,9 @@ export default function PUCExamScreen() {
   const [submissionStatus, setSubmissionStatus] = useState<string>("");
   const [score, setScore] = useState(0);
   const [answerSheetImages, setAnswerSheetImages] = useState<string[]>([]);
+  const [writtenSubmissionId, setWrittenSubmissionId] = useState<string | null>(null);
+  const [evaluationStatus, setEvaluationStatus] = useState<SubmissionStatusResponse | null>(null);
+  const [showDetailedResults, setShowDetailedResults] = useState(false);
 
   const currentPart = generatedExam?.parts[currentPartIndex];
   const currentQuestion = currentPart?.questions[currentQuestionIndex];
@@ -156,8 +162,6 @@ export default function PUCExamScreen() {
         examType: "Full Paper", // Full Karnataka 2nd PUC paper
       });
       
-      console.log("Exam received:", JSON.stringify(exam, null, 2));
-      
       // Validate exam has parts and questions
       if (!exam || !exam.parts || exam.parts.length === 0) {
         throw new Error("Generated exam has no parts. Please try again.");
@@ -166,7 +170,7 @@ export default function PUCExamScreen() {
       // Validate each part has questions
       for (const part of exam.parts) {
         if (!part.questions || part.questions.length === 0) {
-          console.warn(`Part ${part.partName} has no questions`);
+          // Part has no questions - will be handled gracefully
         }
       }
       
@@ -470,7 +474,6 @@ export default function PUCExamScreen() {
         setScore(finalResult.grandScore);
       } catch (resultError) {
         // Results may not be ready yet if written answers are still being evaluated
-        console.log("Results not ready yet:", resultError);
         // Use MCQ result if available
         if (mcqResult) {
           setScore(mcqResult.score);
@@ -732,118 +735,6 @@ export default function PUCExamScreen() {
 
   // Initial Screen - Subject & Grade Selection
   if (screenState === "initial") {
-    
-    // Test function to load sample answer sheets
-    const loadTestAnswerSheets = () => {
-      console.log("Loading sample answer sheets...");
-      
-      // Create a test exam first (required for submission)
-      const testExam: GeneratedExam = {
-        examId: "TEST_EXAM_" + Date.now(),
-        subject: "Mathematics",
-        grade: "2nd PUC",
-        totalMarks: 30,
-        duration: 195,
-        parts: [],
-        instructions: ["Sample test exam"],
-        chapter: "Test",
-        difficulty: "Medium",
-        examType: "Practice",
-        questionCount: 5,
-        createdAt: new Date().toISOString(),
-      };
-      
-      // Create sample data URI images as string[] (just URIs)
-      const sampleImages: string[] = [
-        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
-      ];
-      
-      setGeneratedExam(testExam);
-      setAnswerSheetImages(sampleImages);
-      setScreenState("uploadAnswers");
-      console.log("Sample answer sheets loaded:", sampleImages.length, "with exam:", testExam.examId);
-    };
-    
-    // Test function to load sample results
-    const loadTestResults = () => {
-      // Create minimal test exam
-      const testExam: GeneratedExam = {
-        examId: "TEST_EXAM_123",
-        subject: "Mathematics",
-        grade: "2nd PUC",
-        totalMarks: 30,
-        duration: 195,
-        parts: [],
-        instructions: ["Sample test exam"],
-        chapter: "Test",
-        difficulty: "Medium",
-        examType: "Practice",
-        questionCount: 5,
-        createdAt: new Date().toISOString(),
-      };
-      
-      // Create sample exam result with AI evaluation
-      const testResult: ExamResult = {
-        examId: "TEST_EXAM_123",
-        studentId: "TEST_STUDENT",
-        mcqScore: 8,
-        mcqTotalMarks: 15,
-        subjectiveScore: 12,
-        subjectiveTotalMarks: 15,
-        grandScore: 20,
-        grandTotalMarks: 30,
-        percentage: 66.67,
-        grade: "B",
-        passed: true,
-        subjectiveResults: [
-          {
-            questionId: "Q1",
-            questionNumber: 1,
-            questionText: "Solve the quadratic equation: x² - 5x + 6 = 0",
-            earnedMarks: 4,
-            maxMarks: 5,
-            expectedAnswer: "Step 1: Factor the equation: (x-2)(x-3) = 0\nStep 2: Set each factor to zero: x-2=0 or x-3=0\nStep 3: Solve for x: x=2 or x=3\nTherefore, the solutions are x=2 and x=3",
-            studentAnswer: "x² - 5x + 6 = 0\n(x-2)(x-3) = 0\nx = 2, x = 3",
-            overallFeedback: "Good factoring! You correctly identified the factors and found both solutions. However, you could improve by showing the intermediate step of setting each factor equal to zero.",
-            improvementSuggestions: "Always show the step where you set each factor equal to zero: (x-2)=0 and (x-3)=0. This demonstrates complete understanding of the zero product property.",
-            stepAnalysis: [
-              { description: "Correctly factored the quadratic", marks: 2 },
-              { description: "Found both roots", marks: 2 },
-              { description: "Missing intermediate steps", marks: 0 }
-            ]
-          },
-          {
-            questionId: "Q2",
-            questionNumber: 2,
-            questionText: "Find the derivative of f(x) = 3x³ - 2x² + 5x - 7",
-            earnedMarks: 5,
-            maxMarks: 5,
-            expectedAnswer: "f'(x) = 9x² - 4x + 5\nUsing the power rule: d/dx(xⁿ) = nxⁿ⁻¹\nFor each term:\nd/dx(3x³) = 9x²\nd/dx(-2x²) = -4x\nd/dx(5x) = 5\nd/dx(-7) = 0",
-            studentAnswer: "f'(x) = 9x² - 4x + 5\nApplied power rule to each term.",
-            overallFeedback: "Perfect! You applied the power rule correctly to all terms and arrived at the correct answer.",
-            improvementSuggestions: "Your answer is complete and correct. Well done!",
-          },
-          {
-            questionId: "Q3",
-            questionNumber: 3,
-            questionText: "Evaluate the integral: ∫(2x + 3)dx",
-            earnedMarks: 3,
-            maxMarks: 5,
-            expectedAnswer: "∫(2x + 3)dx = x² + 3x + C\nWhere C is the constant of integration.\nExplanation: ∫2x dx = x² and ∫3 dx = 3x",
-            studentAnswer: "= x² + 3x",
-            overallFeedback: "You got the integration correct, but you're missing the constant of integration (+ C). This is important in indefinite integrals.",
-            improvementSuggestions: "Always include '+ C' (constant of integration) when evaluating indefinite integrals. The constant represents the family of all antiderivatives.",
-          }
-        ]
-      };
-      
-      setGeneratedExam(testExam);
-      setExamResult(testResult);
-      setScore(20);
-      setScreenState("results");
-    };
-    
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient colors={["#4F46E5", "#7C3AED", "#A855F7"]} style={styles.gradient}>
@@ -857,40 +748,6 @@ export default function PUCExamScreen() {
           </TouchableOpacity>
 
           <ScrollView contentContainerStyle={styles.initialScrollContent}>
-            {/* Test Results Button */}
-            <TouchableOpacity
-              style={{
-                backgroundColor: '#FCD34D',
-                padding: 12,
-                borderRadius: 8,
-                marginBottom: 10,
-                alignItems: 'center'
-              }}
-              onPress={loadTestResults}
-            >
-              <Text style={{ color: '#78350F', fontWeight: 'bold' }}>
-                🧪 TEST: View Sample Results Screen
-              </Text>
-            </TouchableOpacity>
-
-            {/* Test Answer Sheets Button */}
-            <TouchableOpacity
-              style={{
-                backgroundColor: '#DBEAFE',
-                padding: 12,
-                borderRadius: 8,
-                marginBottom: 16,
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: '#3B82F6',
-              }}
-              onPress={loadTestAnswerSheets}
-            >
-              <Text style={{ color: '#1E3A8A', fontWeight: 'bold' }}>
-                📄 TEST: Load Sample Answer Sheets
-              </Text>
-            </TouchableOpacity>
-
             {/* Hero Section */}
             <View style={styles.heroSection}>
               <View style={styles.heroIconContainer}>
@@ -1529,17 +1386,11 @@ export default function PUCExamScreen() {
   // Upload Answer Sheet Screen
   if (screenState === "uploadAnswers" && generatedExam) {
     const handleSubmitAnswerSheets = async () => {
-      console.log("=== SUBMIT BUTTON CLICKED ===");
-      console.log("Answer sheet images:", answerSheetImages.length);
-      console.log("Generated exam:", generatedExam?.examId);
-      
       if (answerSheetImages.length === 0) {
         Alert.alert("No Images", "Please upload at least one photo of your answer sheet.");
         return;
       }
 
-      console.log("Starting answer sheet submission...");
-      
       // Set to submitting state
       setScreenState("submitting");
       setSubmissionStatus("Preparing submission...");
@@ -1547,76 +1398,44 @@ export default function PUCExamScreen() {
       try {
         // Upload answer sheet images
         setSubmissionStatus("Uploading answer sheets for AI evaluation...");
-        console.log("Uploading answer sheets:", answerSheetImages.length);
         
-        let uploadSuccess = false;
+        const uploadResult = await uploadWrittenAnswers(generatedExam.examId, studentId, answerSheetImages);
+        
+        // Save submission ID and redirect to evaluating screen
+        setWrittenSubmissionId(uploadResult.writtenSubmissionId);
+        setSubmissionStatus(uploadResult.message);
+        setScreenState("evaluating");
+        
+        // Start polling for status
         try {
-          const uploadResult = await uploadWrittenAnswers(generatedExam.examId, studentId, answerSheetImages);
-          console.log("Upload result:", uploadResult);
-          uploadSuccess = true;
-        } catch (uploadError) {
-          console.log("Upload failed:", uploadError);
-        }
-        
-        // Get results - wait up to 3 minutes for AI processing
-        setSubmissionStatus("AI is evaluating your answers...");
-        let gotResults = false;
-        let retryCount = 0;
-        const maxRetries = 18; // 18 retries * 10 seconds = 3 minutes
-        
-        while (!gotResults && retryCount < maxRetries) {
-          try {
-            const result = await getExamResults(generatedExam.examId, studentId);
-            console.log("Exam results received:", result);
-            if (result && result.grandTotalMarks > 0) {
-              setExamResult(result);
-              setScore(result.grandScore || 0);
-              gotResults = true;
-              break;
+          const finalStatus = await pollSubmissionStatus(
+            uploadResult.writtenSubmissionId,
+            (status) => {
+              // Update UI on each status update
+              setEvaluationStatus(status);
+              setSubmissionStatus(status.statusMessage);
             }
-          } catch (resultError) {
-            console.log(`Results attempt ${retryCount + 1} failed:`, resultError);
+          );
+          
+          // When complete, results are included in the response
+          if (finalStatus.isComplete && finalStatus.result) {
+            setExamResult(finalStatus.result);
+            setScore(finalStatus.result.grandScore || 0);
+            setEvaluationStatus(finalStatus);
           }
           
-          if (!gotResults) {
-            retryCount++;
-            if (retryCount < maxRetries) {
-              setSubmissionStatus(`AI is still evaluating... (${Math.floor(retryCount * 10 / 60)} min ${(retryCount * 10) % 60} sec)`);
-              await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds before retry
-            }
-          }
+        } catch (pollError) {
+          console.error("Polling error:", pollError);
+          // Stay on evaluating screen - don't dismiss it
+          // User can manually check status or go back
         }
-
-        if (!gotResults) {
-          console.log("Failed to get results after all retries");
-          Alert.alert(
-            "Evaluation In Progress",
-            "Your answer sheet has been uploaded successfully. AI evaluation is taking longer than expected. Please check back in a few minutes by going to your exam history.",
-            [
-              {
-                text: "OK",
-                onPress: () => setScreenState("initial")
-              }
-            ]
-          );
-          return;
-        }
-
-        // Successfully got results - transition to results screen
-        console.log("=== TRANSITIONING TO RESULTS ===");
-        setScreenState("results");
         
       } catch (error) {
         console.error("Submit error:", error);
         Alert.alert(
           "Submission Error",
           error instanceof Error ? error.message : "Failed to submit answer sheets. Please try again.",
-          [
-            {
-              text: "OK",
-              onPress: () => setScreenState("uploadAnswers")
-            }
-          ]
+          [{ text: "OK", onPress: () => setScreenState("uploadAnswers") }]
         );
       }
     };
@@ -1751,34 +1570,161 @@ export default function PUCExamScreen() {
     );
   }
 
-  // Results Screen
-  console.log("Checking results screen render:", { screenState, hasExam: !!generatedExam });
-  
-  if (screenState === "results" && generatedExam) {
-    console.log("=== RENDERING RESULTS SCREEN ===");
-    console.log("Exam Result:", examResult);
-    console.log("MCQ Result:", mcqResult);
+  // Evaluating Screen - Waiting for AI evaluation
+  if (screenState === "evaluating") {
+    const isComplete = evaluationStatus?.isComplete || false;
     
+    const handleCheckStatus = async () => {
+      if (!writtenSubmissionId) return;
+      
+      try {
+        setSubmissionStatus("Checking status...");
+        const status = await checkSubmissionStatus(writtenSubmissionId);
+        setEvaluationStatus(status);
+        setSubmissionStatus(status.statusMessage);
+        
+        if (status.isComplete && status.result) {
+          setExamResult(status.result);
+          setScore(status.result.grandScore || 0);
+        }
+      } catch (error) {
+        console.error("Check status error:", error);
+        setSubmissionStatus("Failed to check status. Please try again.");
+      }
+    };
+    
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient colors={["#F0F4FF", "#E0EAFC"]} style={styles.gradient}>
+          <ScrollView contentContainerStyle={styles.evaluatingContainer}>
+            {/* Status Icon */}
+            <View style={styles.evaluatingIconContainer}>
+              {!isComplete ? (
+                <ActivityIndicator size={80} color="#6366f1" />
+              ) : (
+                <Ionicons name="checkmark-circle" size={80} color="#22C55E" />
+              )}
+            </View>
+
+            {/* Status Message */}
+            <Text style={styles.evaluatingTitle}>
+              {isComplete ? '✅ Evaluation Complete!' : '🤖 AI Evaluation in Progress'}
+            </Text>
+            <Text style={styles.evaluatingMessage}>
+              {submissionStatus || 'Processing your answer sheet...'}
+            </Text>
+
+            {/* Progress Info */}
+            {!isComplete && (
+              <View style={styles.evaluatingInfoCard}>
+                <Ionicons name="information-circle" size={24} color="#6366f1" />
+                <Text style={styles.evaluatingInfoText}>
+                  This usually takes 2-5 minutes{'\n'}
+                  Please wait while AI evaluates your answers
+                </Text>
+              </View>
+            )}
+
+            {/* Check Status Button - Show when not complete */}
+            {!isComplete && writtenSubmissionId && (
+              <TouchableOpacity
+                style={styles.checkStatusButton}
+                onPress={handleCheckStatus}
+              >
+                <LinearGradient
+                  colors={["#3B82F6", "#2563EB"]}
+                  style={styles.checkStatusButtonGradient}
+                >
+                  <Ionicons name="refresh" size={20} color="#fff" />
+                  <Text style={styles.checkStatusButtonText}>Check Status Now</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
+            {/* View Results Button - Only show when complete */}
+            {isComplete && evaluationStatus?.result && (
+              <TouchableOpacity
+                style={styles.viewResultsButton}
+                onPress={() => {
+                  setShowDetailedResults(true);
+                  setScreenState("results");
+                }}
+              >
+                <LinearGradient
+                  colors={["#6366f1", "#8b5cf6"]}
+                  style={styles.viewResultsButtonGradient}
+                >
+                  <Ionicons name="document-text" size={22} color="#fff" />
+                  <Text style={styles.viewResultsButtonText}>View Detailed Results</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
+            {/* Quick Summary - Show when complete */}
+            {isComplete && evaluationStatus?.result && (
+              <View style={styles.quickSummaryCard}>
+                <Text style={styles.quickSummaryTitle}>Quick Summary</Text>
+                <View style={styles.quickSummaryRow}>
+                  <Text style={styles.quickSummaryLabel}>Total Score:</Text>
+                  <Text style={styles.quickSummaryValue}>
+                    {evaluationStatus.result.grandScore} / {evaluationStatus.result.grandTotalMarks}
+                  </Text>
+                </View>
+                <View style={styles.quickSummaryRow}>
+                  <Text style={styles.quickSummaryLabel}>Percentage:</Text>
+                  <Text style={styles.quickSummaryValue}>
+                    {evaluationStatus.result.percentage.toFixed(1)}%
+                  </Text>
+                </View>
+                <View style={styles.quickSummaryRow}>
+                  <Text style={styles.quickSummaryLabel}>Grade:</Text>
+                  <Text style={[
+                    styles.quickSummaryGrade,
+                    { color: getGradeColor(evaluationStatus.result.grade) }
+                  ]}>
+                    {evaluationStatus.result.grade}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Cancel Button */}
+            {!isComplete && (
+              <TouchableOpacity
+                style={styles.cancelWaitingButton}
+                onPress={() => {
+                  Alert.alert(
+                    'Cancel Evaluation?',
+                    'Your answer sheet will continue to be evaluated in the background. You can check results later.',
+                    [
+                      { text: 'Continue Waiting', style: 'cancel' },
+                      { text: 'Go Back', onPress: () => setScreenState('initial') }
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.cancelWaitingButtonText}>Go Back</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        </LinearGradient>
+      </SafeAreaView>
+    );
+  }
+
+  // Results Screen
+  if (screenState === "results" && generatedExam) {
     // Build MCQ results from exam data and userAnswers if not provided by backend
     let mcqResultsArray: any[] = [];
     const hasBackendMcqResults = examResult?.mcqResults && examResult.mcqResults.length > 0;
     
-    console.log("=== DEBUG MCQ BUILDING ===");
-    console.log("hasBackendMcqResults:", hasBackendMcqResults);
-    console.log("userAnswers:", userAnswers);
-    console.log("generatedExam.parts:", generatedExam.parts.length);
-    
     if (!hasBackendMcqResults && userAnswers && Object.keys(userAnswers).length > 0) {
-      console.log("Building MCQ results from userAnswers:", Object.keys(userAnswers).length);
       let questionNumber = 1;
       for (const part of generatedExam.parts) {
-        console.log("Checking part:", part.partName, "Questions:", part.questions.length);
         for (const question of part.questions) {
-          console.log("Question:", question.questionId, "Has options:", !!question.options, "Options length:", question.options?.length, "isMCQ:", isMCQ(question));
           if (isMCQ(question) && userAnswers[question.questionId]) {
             const studentAnswer = userAnswers[question.questionId];
             const isCorrect = studentAnswer === question.correctAnswer;
-            console.log("Adding MCQ result:", { questionId: question.questionId, studentAnswer, correctAnswer: question.correctAnswer, isCorrect });
             mcqResultsArray.push({
               questionId: question.questionId,
               questionNumber: questionNumber++,
@@ -1792,11 +1738,6 @@ export default function PUCExamScreen() {
           }
         }
       }
-      console.log("Built MCQ results array:", mcqResultsArray.length, "questions");
-    } else {
-      console.log("Not building MCQ results - backend has data or no userAnswers");
-      console.log("Backend MCQ results:", examResult?.mcqResults?.length || 0);
-      console.log("userAnswers count:", Object.keys(userAnswers || {}).length);
     }
     
     // Merge MCQ results with examResult if needed
@@ -1804,12 +1745,10 @@ export default function PUCExamScreen() {
       // Only use backend results if they exist and are not empty
       if (!examResult.mcqResults || examResult.mcqResults.length === 0) {
         examResult.mcqResults = mcqResultsArray;
-        console.log("Merged MCQ results into examResult:", mcqResultsArray.length, "questions");
       }
     }
     
     const finalMcqResults = examResult?.mcqResults || mcqResultsArray;
-    console.log("Final MCQ results to display:", finalMcqResults.length);
     
     // Use API result if available, otherwise calculate locally
     const totalScore = examResult ? examResult.grandScore : (mcqResult ? mcqResult.score : score);
@@ -3531,5 +3470,139 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#EF4444',
+  },
+  // Evaluating Screen Styles
+  evaluatingContainer: {
+    flexGrow: 1,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  evaluatingIconContainer: {
+    marginBottom: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  evaluatingTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1E293B',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  evaluatingMessage: {
+    fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 32,
+    paddingHorizontal: 24,
+  },
+  evaluatingInfoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 32,
+    gap: 12,
+  },
+  evaluatingInfoText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#4F46E5',
+    lineHeight: 20,
+  },
+  checkStatusButton: {
+    width: '100%',
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  checkStatusButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  checkStatusButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  viewResultsButton: {
+    width: '100%',
+    marginBottom: 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  viewResultsButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    gap: 10,
+  },
+  viewResultsButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  quickSummaryCard: {
+    width: '100%',
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  quickSummaryTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 16,
+  },
+  quickSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  quickSummaryLabel: {
+    fontSize: 15,
+    color: '#64748B',
+  },
+  quickSummaryValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  quickSummaryGrade: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  cancelWaitingButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  cancelWaitingButtonText: {
+    color: '#64748B',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

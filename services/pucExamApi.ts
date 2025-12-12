@@ -475,7 +475,6 @@ export async function uploadWrittenAnswers(
     }
 
     const result = await response.json();
-    console.log("Written answers uploaded:", result.writtenSubmissionId);
     
     return result;
   } catch (error: any) {

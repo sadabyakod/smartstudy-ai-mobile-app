@@ -1,22 +1,43 @@
 import React, { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import LearningHub from "./components/LearningHub";
 import ChatScreen from "./components/ChatScreen";
-import ExamScreen from "./components/ExamScreen";
-import { TabContext, TabKey } from "./contexts/TabContext";
+import ModelPaperScreen from "./components/ModelPaperScreen";
+import PUCExamScreen from "./components/PUCExamScreen";
+import { NavigationContext, Screen } from "./navigation/NavigationContext";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabKey>("chat");
+  const [currentScreen, setCurrentScreen] = useState<Screen>("home");
+
+  const navigate = (screen: Screen) => {
+    setCurrentScreen(screen);
+  };
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case "home":
+        return <LearningHub />;
+      case "chat":
+        return <ChatScreen />;
+      case "exam":
+        return <ModelPaperScreen />;
+      case "puc-exam":
+        return <PUCExamScreen />;
+      default:
+        return <LearningHub />;
+    }
+  };
 
   return (
     <SafeAreaProvider>
-      <TabContext.Provider value={{ activeTab, setActiveTab }}>
+      <NavigationContext.Provider value={{ navigate }}>
         <View style={styles.container}>
           <View style={styles.content}>
-            {activeTab === "chat" ? <ChatScreen /> : <ExamScreen />}
+            {renderScreen()}
           </View>
         </View>
-      </TabContext.Provider>
+      </NavigationContext.Provider>
     </SafeAreaProvider>
   );
 }
