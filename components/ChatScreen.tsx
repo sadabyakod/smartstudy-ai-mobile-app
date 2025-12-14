@@ -234,7 +234,8 @@ export default function ChatScreen() {
 
     try {
       const response = await sendChatMessage({
-        question: userMsg.text,
+        message: userMsg.text,
+        language: 'English',
         sessionId,
       });
 

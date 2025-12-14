@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import {
   View,
   Text,
@@ -8,11 +8,14 @@ import {
   StatusBar,
   Dimensions,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { NavigationContext } from "../navigation/NavigationContext";
+import { checkSubmissionStatus, getExamResults, SubmissionStatusResponse } from "../services/pucExamApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -123,32 +126,105 @@ const subjects = [
 ];
 
 // ============================================
+// EVALUATION STATUS CONFIG
+// ============================================
+
+const STATUS_CONFIG = {
+  PendingEvaluation: { icon: "⏳", color: "#F59E0B", message: "Your answer sheet is being processed..." },
+  OcrProcessing: { icon: "📄", color: "#3B82F6", message: "Extracting text from your answer sheet..." },
+  Evaluating: { icon: "🤖", color: "#8B5CF6", message: "AI is evaluating your answers..." },
+  Completed: { icon: "✅", color: "#10B981", message: "Evaluation completed! Your results are ready." },
+  Failed: { icon: "❌", color: "#EF4444", message: "Evaluation failed. Please contact support." }
+};
+
+// ============================================
 // COMPONENT
 // ============================================
 
 export default function LearningHub() {
-  const { navigate } = useContext(NavigationContext);
+  const { navigate, pendingEvaluation, setPendingEvaluation } = useContext(NavigationContext);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [evaluationStatus, setEvaluationStatus] = useState<SubmissionStatusResponse | null>(null);
+
+  // Get current status config
+  const getCurrentStatusConfig = () => {
+    const status = evaluationStatus?.status || "PendingEvaluation";
+    return STATUS_CONFIG[status] || STATUS_CONFIG.PendingEvaluation;
+  };
+
+  const handleCheckStatus = async () => {
+    if (!pendingEvaluation) return;
+    
+    setIsCheckingStatus(true);
+    try {
+      const status = await checkSubmissionStatus(pendingEvaluation.writtenSubmissionId);
+      setEvaluationStatus(status);
+      
+      if (status.isComplete) {
+        if (status.status === "Completed" && status.result) {
+          Alert.alert(
+            "✅ Evaluation Complete!",
+            `Your score: ${status.result.grandScore}/${status.result.grandTotalMarks} (${status.result.percentage.toFixed(1)}%)\nGrade: ${status.result.grade}`,
+            [
+              {
+                text: "View Details",
+                onPress: () => {
+                  // Navigate to PUC exam to show results
+                  navigate("puc-exam");
+                },
+              },
+              {
+                text: "Dismiss",
+                onPress: () => {
+                  setPendingEvaluation(null);
+                  setEvaluationStatus(null);
+                },
+              },
+            ]
+          );
+        } else if (status.status === "Failed") {
+          Alert.alert(
+            "❌ Evaluation Failed",
+            status.statusMessage || "There was an error evaluating your answer sheet. Please contact support.",
+            [
+              {
+                text: "Dismiss",
+                onPress: () => {
+                  setPendingEvaluation(null);
+                  setEvaluationStatus(null);
+                },
+              },
+            ]
+          );
+        }
+      }
+    } catch (error: any) {
+      console.error("Check status error:", error);
+      
+      // Check if submission not found - clear the pending evaluation
+      const errorMessage = error?.message || error?.userMessage || error?.toString() || "";
+      if (errorMessage.toLowerCase().includes("not found") || 
+          errorMessage.includes("404") ||
+          error?.statusCode === 404) {
+        // Auto-clear the stale pending evaluation
+        setPendingEvaluation(null);
+        setEvaluationStatus(null);
+        Alert.alert(
+          "Submission Not Found",
+          "This evaluation has expired or was already processed. The status has been cleared."
+        );
+      } else {
+        Alert.alert("Error", "Failed to check status. Please try again.");
+      }
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
 
   const features = [
     {
-      id: 1,
-      title: "Study Help",
-      description: "Get answers to your questions",
-      icon: "school-outline",
-      gradient: COLORS.studyHelp,
-      action: () => navigate("chat"),
-    },
-    {
-      id: 2,
-      title: "Practice MCQs",
-      description: "Test your knowledge",
-      icon: "checkbox-outline",
-      gradient: COLORS.mcq,
-      action: () => navigate("exam"),
-    },
-    {
       id: 3,
-      title: "PUC Exams",
+      title: "Generate Question Paper",
       description: "Karnataka board papers",
       icon: "clipboard-outline",
       gradient: COLORS.pucExam,
@@ -156,11 +232,11 @@ export default function LearningHub() {
     },
     {
       id: 4,
-      title: "Model Papers",
-      description: "Full practice tests",
-      icon: "document-text-outline",
+      title: "Download Syllabus",
+      description: "Subject-wise syllabus PDF",
+      icon: "download-outline",
       gradient: COLORS.modelPapers,
-      action: () => navigate("puc-exam"),
+      action: () => navigate("syllabus"),
     },
   ];
 
@@ -176,17 +252,27 @@ export default function LearningHub() {
         style={styles.header}
       >
         <View style={styles.headerContent}>
-          <View style={styles.logoContainer}>
-            <MaterialCommunityIcons
-              name="book-open-page-variant"
-              size={ICON_SIZE.lg}
-              color={COLORS.textInverse}
-            />
+          <View style={styles.headerLeft}>
+            <View style={styles.logoContainer}>
+              <MaterialCommunityIcons
+                name="book-open-page-variant"
+                size={ICON_SIZE.lg}
+                color={COLORS.textInverse}
+              />
+            </View>
+            <View style={styles.headerText}>
+              <Text style={styles.headerTitle}>Study Assistant</Text>
+              <Text style={styles.headerSubtitle}>Your learning companion</Text>
+            </View>
           </View>
-          <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>Study Assistant</Text>
-            <Text style={styles.headerSubtitle}>Your learning companion</Text>
-          </View>
+
+          <TouchableOpacity
+            style={styles.chatIconButton}
+            onPress={() => navigate("chat")}
+            accessibilityLabel="Go to Chat"
+          >
+            <Ionicons name="chatbubbles-outline" size={ICON_SIZE.md} color={COLORS.textInverse} />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -216,6 +302,50 @@ export default function LearningHub() {
             </Text>
           </View>
         </View>
+
+        {/* PENDING EVALUATION STATUS CARD */}
+        {pendingEvaluation && (
+          <View style={styles.evaluationCard}>
+            <LinearGradient
+              colors={[getCurrentStatusConfig().color, "#8B5CF6"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.evaluationGradient}
+            >
+              <View style={styles.evaluationHeader}>
+                <View style={[styles.evaluationIconContainer, { backgroundColor: getCurrentStatusConfig().color }]}>
+                  <Text style={styles.evaluationEmoji}>{getCurrentStatusConfig().icon}</Text>
+                </View>
+                <View style={styles.evaluationInfo}>
+                  <Text style={styles.evaluationTitle}>
+                    {evaluationStatus?.status === "Completed" ? "Evaluation Complete" : 
+                     evaluationStatus?.status === "Failed" ? "Evaluation Failed" : 
+                     "Evaluation in Progress"}
+                  </Text>
+                  <Text style={styles.evaluationSubject}>{pendingEvaluation.subject}</Text>
+                  <Text style={styles.evaluationStatus}>
+                    {evaluationStatus?.statusMessage || getCurrentStatusConfig().message}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.checkStatusButton}
+                onPress={handleCheckStatus}
+                disabled={isCheckingStatus}
+              >
+                {isCheckingStatus ? (
+                  <ActivityIndicator size="small" color={getCurrentStatusConfig().color} />
+                ) : (
+                  <>
+                    <Ionicons name="refresh" size={18} color={getCurrentStatusConfig().color} />
+                    <Text style={[styles.checkStatusText, { color: getCurrentStatusConfig().color }]}>Check Status Now</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        )}
 
         {/* FEATURES SECTION */}
         <View style={styles.section}>
@@ -253,13 +383,6 @@ export default function LearningHub() {
                 <Text style={styles.featureDescription} numberOfLines={2}>
                   {feature.description}
                 </Text>
-                <View style={styles.featureArrow}>
-                  <Ionicons
-                    name="arrow-forward"
-                    size={ICON_SIZE.sm}
-                    color={COLORS.textTertiary}
-                  />
-                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -268,7 +391,7 @@ export default function LearningHub() {
         {/* SUBJECTS SECTION */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Browse by Subject</Text>
+            <Text style={styles.sectionTitle}>Browse Model Question Paper by Subject</Text>
             <Text style={styles.sectionSubtitle}>Select a subject to practice</Text>
           </View>
 
@@ -299,11 +422,6 @@ export default function LearningHub() {
                   <Text style={styles.subjectName}>{subject.name}</Text>
                   <Text style={styles.subjectMeta}>{subject.questions}+ questions</Text>
                 </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={ICON_SIZE.sm}
-                  color={COLORS.textTertiary}
-                />
               </TouchableOpacity>
             ))}
           </View>
@@ -354,6 +472,13 @@ const styles = StyleSheet.create({
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: SPACING.md,
   },
   logoContainer: {
     width: 48,
@@ -375,6 +500,9 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.bodyMedium,
     color: "rgba(255, 255, 255, 0.8)",
     marginTop: SPACING.xs,
+  },
+  chatIconButton: {
+    padding: SPACING.sm,
   },
 
   // Scroll
@@ -573,6 +701,78 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     backgroundColor: COLORS.divider,
+  },
+
+  // Evaluation Status Card
+  evaluationCard: {
+    marginBottom: SPACING.xxxl,
+    borderRadius: RADIUS.xl,
+    overflow: "hidden",
+    shadowColor: "#6366F1",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  evaluationGradient: {
+    padding: SPACING.xl,
+  },
+  evaluationHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: SPACING.lg,
+  },
+  evaluationIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.md,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: SPACING.md,
+  },
+  evaluationEmoji: {
+    fontSize: 24,
+  },
+  evaluationInfo: {
+    flex: 1,
+  },
+  evaluationTitle: {
+    ...TYPOGRAPHY.titleLarge,
+    color: COLORS.textInverse,
+    marginBottom: SPACING.xs,
+  },
+  evaluationSubject: {
+    ...TYPOGRAPHY.titleMedium,
+    color: "rgba(255, 255, 255, 0.9)",
+    marginBottom: SPACING.xs,
+  },
+  evaluationStatus: {
+    ...TYPOGRAPHY.bodySmall,
+    color: "rgba(255, 255, 255, 0.8)",
+  },
+  checkStatusButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.textInverse,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+  checkStatusText: {
+    ...TYPOGRAPHY.titleMedium,
+    color: "#6366F1",
+    marginLeft: SPACING.sm,
+  },
+  dismissButton: {
+    alignItems: "center",
+    paddingVertical: SPACING.sm,
+  },
+  dismissText: {
+    ...TYPOGRAPHY.bodySmall,
+    color: "rgba(255, 255, 255, 0.7)",
   },
 
   // Footer

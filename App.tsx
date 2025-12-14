@@ -5,13 +5,23 @@ import LearningHub from "./components/LearningHub";
 import ChatScreen from "./components/ChatScreen";
 import ModelPaperScreen from "./components/ModelPaperScreen";
 import PUCExamScreen from "./components/PUCExamScreen";
-import { NavigationContext, Screen } from "./navigation/NavigationContext";
+import SyllabusScreen from "./components/SyllabusScreen";
+import DownloadModelPapersScreen from "./components/DownloadModelPapersScreen";
+import { NavigationContext, Screen, PendingEvaluation } from "./navigation/NavigationContext";
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>("home");
+  const [stack, setStack] = useState<Screen[]>(["home"]);
+  const [pendingEvaluation, setPendingEvaluation] = useState<PendingEvaluation | null>(null);
+
+  const currentScreen = stack[stack.length - 1];
+  const canGoBack = stack.length > 1;
 
   const navigate = (screen: Screen) => {
-    setCurrentScreen(screen);
+    setStack((prev) => [...prev, screen]);
+  };
+
+  const goBack = () => {
+    setStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
   };
 
   const renderScreen = () => {
@@ -24,6 +34,10 @@ export default function App() {
         return <ModelPaperScreen />;
       case "puc-exam":
         return <PUCExamScreen />;
+      case "syllabus":
+        return <SyllabusScreen />;
+      case "download-papers":
+        return <DownloadModelPapersScreen />;
       default:
         return <LearningHub />;
     }
@@ -31,7 +45,14 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContext.Provider value={{ navigate }}>
+      <NavigationContext.Provider value={{ 
+        currentScreen, 
+        navigate, 
+        goBack, 
+        canGoBack,
+        pendingEvaluation,
+        setPendingEvaluation 
+      }}>
         <View style={styles.container}>
           <View style={styles.content}>
             {renderScreen()}

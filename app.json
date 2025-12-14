@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Study Assistant",
-    "slug": "studyassistant",
+    "slug": "smartstudyaichatbot",
     "version": "11",
     "android": {
       "package": "com.sadashivbyakod.smartstudyaichatbot",

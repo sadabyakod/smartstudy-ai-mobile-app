@@ -1,17 +1,21 @@
 import { CHAT_ENDPOINTS, getUserFriendlyErrorMessage, fetchWithTimeout, ERROR_MESSAGES } from "../config/api";
 
 export interface SendChatRequest {
-  question: string;
+  message: string;
+  language?: string;
   sessionId?: string | null;
 }
 
 export interface SendChatResponse {
   status?: string;
   sessionId?: string;
-  question?: string;
   reply?: string;
+  language?: string;
+  sources?: string[];
   timestamp?: string;
   error?: string;
+  // Legacy fields for backward compatibility
+  question?: string;
   answer?: string;
   followUpQuestion?: string;
 }
@@ -43,7 +47,8 @@ export async function sendChatMessage(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        question: payload.question,
+        message: payload.message,
+        language: payload.language ?? 'English',
         sessionId: payload.sessionId ?? undefined,
       }),
     });

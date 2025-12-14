@@ -46,9 +46,9 @@ export interface StartExamResponse {
 }
 
 export interface SubmitAnswerRequest {
+  attemptId: number;
   questionId: number;
-  selectedOptionId: number | null;
-  freeTextAnswer: string | null;
+  answer: string | number | null;
   timeTakenSeconds: number;
 }
 
@@ -217,7 +217,12 @@ export async function submitExamAnswer(
 ): Promise<SubmitAnswerResponse> {
   return request<SubmitAnswerResponse>(EXAM_ENDPOINTS.submitAnswer(attemptId), {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      attemptId: payload.attemptId,
+      questionId: payload.questionId,
+      answer: payload.answer,
+      timeTakenSeconds: payload.timeTakenSeconds,
+    }),
   });
 }
 

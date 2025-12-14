@@ -39,7 +39,7 @@ import {
   checkSubmissionStatus,
   SubmissionStatusResponse,
 } from "../services/pucExamApi";
-import { API_BASE_URL } from "../config/api";
+import { API_BASE_URL, getUserFriendlyErrorMessage, ERROR_MESSAGES } from "../config/api";
 import { NavigationContext } from "../navigation/NavigationContext";
 
 type ScreenState = "initial" | "loading" | "exam" | "question" | "questionPaper" | "uploadAnswers" | "submitting" | "results" | "evaluating";
@@ -118,7 +118,7 @@ function McqResultItem({ mcqRes, styles }: { mcqRes: any; styles: any }) {
 }
 
 export default function PUCExamScreen() {
-  const { navigate } = useContext(NavigationContext);
+  const { navigate, goBack, canGoBack, setPendingEvaluation } = useContext(NavigationContext);
   
   // Form state
   const [selectedSubject, setSelectedSubject] = useState(PUC_SUBJECTS[0]);
@@ -148,6 +148,14 @@ export default function PUCExamScreen() {
   const currentPart = generatedExam?.parts[currentPartIndex];
   const currentQuestion = currentPart?.questions[currentQuestionIndex];
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleBackNavigation = () => {
+    if (canGoBack) {
+      goBack();
+    } else {
+      navigate("home");
+    }
+  };
 
   const handleGenerateExam = async () => {
     try {
@@ -183,12 +191,12 @@ export default function PUCExamScreen() {
       setScreenState("exam");
     } catch (error: any) {
       console.error("Generation error:", error);
-      const message = error?.message || "Unknown error occurred";
+      const message = getUserFriendlyErrorMessage(error) || ERROR_MESSAGES.UNKNOWN_ERROR;
       setErrorMessage(message);
       
       // Show alert with retry option
       Alert.alert(
-        "Connection Error",
+        "Connection Issue",
         message,
         [
           {
@@ -459,33 +467,84 @@ export default function PUCExamScreen() {
         setScore(mcqRes.score);
       }
       
-      // Step 3: Upload written answers if any
+      // Step 3: Upload written answers if any - now async, navigates to evaluating screen
       if (writtenImageUris.length > 0) {
         setSubmissionStatus("Uploading written answers for AI evaluation...");
-        await uploadWrittenAnswers(generatedExam.examId, studentId, writtenImageUris);
-        setSubmissionStatus("AI is evaluating your written answers...");
+        const uploadResult = await uploadWrittenAnswers(generatedExam.examId, studentId, writtenImageUris);
+        
+        // Save submission ID and redirect to evaluating screen for polling
+        setWrittenSubmissionId(uploadResult.writtenSubmissionId);
+        setSubmissionStatus(uploadResult.message || "✅ Answer sheet uploaded successfully!");
+        setScreenState("evaluating");
+        
+        // Start polling for status
+        try {
+          const finalStatus = await pollSubmissionStatus(
+            uploadResult.writtenSubmissionId,
+            (status) => {
+              setEvaluationStatus(status);
+              setSubmissionStatus(status.statusMessage);
+            }
+          );
+          
+          if (finalStatus.isComplete && finalStatus.result) {
+            setExamResult(finalStatus.result);
+            setScore(finalStatus.result.grandScore || 0);
+            setEvaluationStatus(finalStatus);
+          }
+        } catch (pollError) {
+          console.error("Polling error:", pollError);
+        }
+        return; // Exit here, results will be shown from evaluating screen
       }
       
-      // Step 4: Get final results
+      // Step 4: Get final results (only if no written answers - MCQ only)
       setSubmissionStatus("Fetching final results...");
       try {
         finalResult = await getExamResults(generatedExam.examId, studentId);
         setExamResult(finalResult);
         setScore(finalResult.grandScore);
       } catch (resultError) {
-        // Results may not be ready yet if written answers are still being evaluated
-        // Use MCQ result if available
+        // Results may not be ready yet
         if (mcqResult) {
           setScore(mcqResult.score);
         }
       }
       
       setScreenState("results");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Submit exam error:", error);
+      
+      // Handle 409 Conflict - duplicate submission
+      if (error?.status === 409) {
+        Alert.alert(
+          "Already Submitted",
+          "⚠️ You have already submitted answers for this exam. Duplicate submissions are not allowed.",
+          [
+            { text: "View Results", onPress: () => {
+              if (generatedExam) {
+                setScreenState("loading");
+                getExamResults(generatedExam.examId, studentId)
+                  .then((result) => {
+                    setExamResult(result);
+                    setScore(result.grandScore || 0);
+                    setScreenState("results");
+                  })
+                  .catch(() => {
+                    Alert.alert("Results Not Ready", "Your previous submission is still being evaluated. Please try again later.");
+                    setScreenState("initial");
+                  });
+              }
+            }},
+            { text: "Go Back", onPress: () => setScreenState("question") }
+          ]
+        );
+        return;
+      }
+      
       Alert.alert(
         "Submission Failed",
-        "Failed to submit exam. Would you like to try again or calculate score locally?",
+        error?.message || "Failed to submit exam. Would you like to try again or calculate score locally?",
         [
           {
             text: "Try Again",
@@ -738,14 +797,24 @@ export default function PUCExamScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient colors={["#4F46E5", "#7C3AED", "#A855F7"]} style={styles.gradient}>
-          {/* Back Button */}
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => navigate("exam")}
-          >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
+          {/* Top Bar */}
+          <View style={styles.topBar}>
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={handleBackNavigation}
+            >
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.chatIconButton}
+              onPress={() => navigate("chat")}
+              accessibilityLabel="Go to Chat"
+            >
+              <Ionicons name="chatbubbles-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
 
           <ScrollView contentContainerStyle={styles.initialScrollContent}>
             {/* Hero Section */}
@@ -813,6 +882,13 @@ export default function PUCExamScreen() {
             <Text style={styles.noteText}>
               ⏱️ AI generation may take 30-60 seconds
             </Text>
+
+            {errorMessage && (
+              <View style={styles.errorBanner}>
+                <Ionicons name="warning" size={18} color="#B91C1C" />
+                <Text style={styles.errorBannerText}>{errorMessage}</Text>
+              </View>
+            )}
           </ScrollView>
 
           {/* Subject Picker Modal */}
@@ -915,9 +991,6 @@ export default function PUCExamScreen() {
               AI is creating {selectedSubject} questions for {selectedGrade}
             </Text>
             <Text style={styles.loadingSubtext}>This may take 30-60 seconds</Text>
-            <Text style={[styles.loadingSubtext, { marginTop: 10, opacity: 0.7 }]}>
-              Connecting to: {API_BASE_URL}
-            </Text>
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={() => setScreenState("initial")}
@@ -1401,40 +1474,72 @@ export default function PUCExamScreen() {
         
         const uploadResult = await uploadWrittenAnswers(generatedExam.examId, studentId, answerSheetImages);
         
-        // Save submission ID and redirect to evaluating screen
+        // Save submission ID for tracking
         setWrittenSubmissionId(uploadResult.writtenSubmissionId);
-        setSubmissionStatus(uploadResult.message);
-        setScreenState("evaluating");
         
-        // Start polling for status
-        try {
-          const finalStatus = await pollSubmissionStatus(
-            uploadResult.writtenSubmissionId,
-            (status) => {
-              // Update UI on each status update
-              setEvaluationStatus(status);
-              setSubmissionStatus(status.statusMessage);
-            }
+        // Set pending evaluation in global context
+        setPendingEvaluation({
+          writtenSubmissionId: uploadResult.writtenSubmissionId,
+          examId: generatedExam.examId,
+          studentId: studentId,
+          subject: generatedExam.subject || selectedSubject,
+          submittedAt: new Date(),
+        });
+        
+        // Show success message and navigate to home
+        Alert.alert(
+          "✅ Upload Successful!",
+          "Your answer sheet has been uploaded successfully. AI evaluation is in progress. You can check the status from the home screen.",
+          [
+            {
+              text: "Go to Home",
+              onPress: () => {
+                // Reset exam state
+                setScreenState("initial");
+                setAnswerSheetImages([]);
+                setGeneratedExam(null);
+                // Navigate to home
+                navigate("home");
+              },
+            },
+          ]
+        );
+        
+      } catch (error: any) {
+        console.error("Submit error:", error);
+        
+        // Handle 409 Conflict - duplicate submission
+        if (error?.status === 409) {
+          Alert.alert(
+            "Already Submitted",
+            "⚠️ You have already submitted answers for this exam. Duplicate submissions are not allowed.",
+            [
+              { text: "View Results", onPress: () => {
+                // Try to fetch existing results
+                if (generatedExam) {
+                  setScreenState("loading");
+                  getExamResults(generatedExam.examId, studentId)
+                    .then((result) => {
+                      setExamResult(result);
+                      setScore(result.grandScore || 0);
+                      setScreenState("results");
+                    })
+                    .catch(() => {
+                      Alert.alert("Results Not Ready", "Your previous submission is still being evaluated. Please try again later.");
+                      setScreenState("initial");
+                    });
+                }
+              }},
+              { text: "Go Back", onPress: () => setScreenState("initial") }
+            ]
           );
-          
-          // When complete, results are included in the response
-          if (finalStatus.isComplete && finalStatus.result) {
-            setExamResult(finalStatus.result);
-            setScore(finalStatus.result.grandScore || 0);
-            setEvaluationStatus(finalStatus);
-          }
-          
-        } catch (pollError) {
-          console.error("Polling error:", pollError);
-          // Stay on evaluating screen - don't dismiss it
-          // User can manually check status or go back
+          return;
         }
         
-      } catch (error) {
-        console.error("Submit error:", error);
+        // Handle other errors
         Alert.alert(
           "Submission Error",
-          error instanceof Error ? error.message : "Failed to submit answer sheets. Please try again.",
+          error?.message || "Failed to submit answer sheets. Please try again.",
           [{ text: "OK", onPress: () => setScreenState("uploadAnswers") }]
         );
       }
@@ -1559,11 +1664,10 @@ export default function PUCExamScreen() {
         <LinearGradient colors={["#4F46E5", "#7C3AED", "#A855F7"]} style={styles.gradient}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#fff" />
-            <Text style={styles.loadingText}>Submitting your exam...</Text>
+            <Text style={styles.loadingText}>Uploading your answer sheet...</Text>
             <Text style={styles.loadingSubtext}>
               {submissionStatus || "Processing your answers..."}
             </Text>
-            <Text style={styles.loadingSubtext}>This may take up to 2 minutes</Text>
           </View>
         </LinearGradient>
       </SafeAreaView>
@@ -1611,7 +1715,7 @@ export default function PUCExamScreen() {
               {isComplete ? '✅ Evaluation Complete!' : '🤖 AI Evaluation in Progress'}
             </Text>
             <Text style={styles.evaluatingMessage}>
-              {submissionStatus || 'Processing your answer sheet...'}
+              {submissionStatus || '⏳ Your answer sheet is being processed...'}
             </Text>
 
             {/* Progress Info */}
@@ -1619,8 +1723,18 @@ export default function PUCExamScreen() {
               <View style={styles.evaluatingInfoCard}>
                 <Ionicons name="information-circle" size={24} color="#6366f1" />
                 <Text style={styles.evaluatingInfoText}>
-                  This usually takes 2-5 minutes{'\n'}
-                  Please wait while AI evaluates your answers
+                  Status updates every 3 seconds{'\n'}
+                  This usually takes 2-5 minutes
+                </Text>
+              </View>
+            )}
+
+            {/* Failed Status Message */}
+            {isComplete && evaluationStatus?.status === 'Failed' && (
+              <View style={[styles.evaluatingInfoCard, { backgroundColor: '#FEE2E2' }]}>
+                <Ionicons name="alert-circle" size={24} color="#EF4444" />
+                <Text style={[styles.evaluatingInfoText, { color: '#DC2626' }]}>
+                  Evaluation failed. Please contact support or try again.
                 </Text>
               </View>
             )}
@@ -1641,8 +1755,8 @@ export default function PUCExamScreen() {
               </TouchableOpacity>
             )}
 
-            {/* View Results Button - Only show when complete */}
-            {isComplete && evaluationStatus?.result && (
+            {/* View Results Button - Only show when complete AND status is Completed */}
+            {isComplete && evaluationStatus?.status === 'Completed' && evaluationStatus?.result && (
               <TouchableOpacity
                 style={styles.viewResultsButton}
                 onPress={() => {
@@ -2022,6 +2136,12 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
 
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
   // Back Button
   backButton: {
     flexDirection: "row",
@@ -2034,6 +2154,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
+  },
+
+  chatIconButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
 
   // My Chat Button
@@ -2201,6 +2326,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 16,
     fontSize: 14,
+  },
+  errorBanner: {
+    marginTop: 12,
+    backgroundColor: "#FEE2E2",
+    borderColor: "#FCA5A5",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  errorBannerText: {
+    color: "#B91C1C",
+    fontSize: 14,
+    flex: 1,
+    marginLeft: 8,
   },
 
   // Loading

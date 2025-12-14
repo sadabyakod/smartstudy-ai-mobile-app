@@ -467,10 +467,32 @@ export async function uploadWrittenAnswers(
         method: "POST",
         body: formData,
       },
-      60000
+      15000 // API now returns immediately (<1 second), reduced from 60s
     );
 
     if (!response.ok) {
+      // Handle specific error codes
+      if (response.status === 409) {
+        throw new ApiError(
+          'You have already submitted answers for this exam. Duplicate submissions are not allowed.',
+          409,
+          false,
+          false
+        );
+      }
+      if (response.status === 400) {
+        let errorMessage = 'Invalid file. Please check file type (jpg, jpeg, png, webp, pdf) and size (max 10MB per file, max 20 files).';
+        try {
+          const errorBody = await response.json();
+          if (errorBody?.message) {
+            errorMessage = errorBody.message;
+          }
+        } catch {}
+        throw new ApiError(errorMessage, 400);
+      }
+      if (response.status === 404) {
+        throw new ApiError('Exam not found. Please generate a new exam and try again.', 404);
+      }
       throw new ApiError(ERROR_MESSAGES.SERVER_ERROR, response.status);
     }
 
@@ -580,8 +602,8 @@ export async function checkSubmissionStatus(
 export async function pollSubmissionStatus(
   writtenSubmissionId: string,
   onStatusUpdate: (status: SubmissionStatusResponse) => void,
-  pollInterval: number = 5000,
-  maxAttempts: number = 120
+  pollInterval: number = 3000, // Poll every 3 seconds (updated from 5s)
+  maxAttempts: number = 100 // 100 attempts × 3s = 5 minutes max (updated from 10 min)
 ): Promise<SubmissionStatusResponse> {
   return new Promise((resolve, reject) => {
     let attempts = 0;
