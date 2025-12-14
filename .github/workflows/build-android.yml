@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: smartstudy-ai-mobile-app/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -33,11 +33,9 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        working-directory: ./smartstudy-ai-mobile-app
         run: npm ci
 
       - name: Setup release keystore
-        working-directory: ./smartstudy-ai-mobile-app
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
@@ -50,7 +48,7 @@ jobs:
           fi
 
       - name: Build APK (Release signed if keystore available)
-        working-directory: ./smartstudy-ai-mobile-app/android
+        working-directory: ./android
         env:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -69,7 +67,7 @@ jobs:
           fi
 
       - name: Build AAB (App Bundle)
-        working-directory: ./smartstudy-ai-mobile-app/android
+        working-directory: ./android
         env:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -89,14 +87,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: smartstudy-apk
-          path: smartstudy-ai-mobile-app/android/app/build/outputs/apk/release/*.apk
+          path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
           name: smartstudy-aab
-          path: smartstudy-ai-mobile-app/android/app/build/outputs/bundle/release/*.aab
+          path: android/app/build/outputs/bundle/release/*.aab
           retention-days: 30
 
       - name: Create Release (on tag)
@@ -104,7 +102,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            smartstudy-ai-mobile-app/android/app/build/outputs/apk/release/*.apk
-            smartstudy-ai-mobile-app/android/app/build/outputs/bundle/release/*.aab
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
