@@ -36,22 +36,33 @@ jobs:
         working-directory: ./smartstudy-ai-mobile-app
         run: npm ci
 
-      - name: Setup release keystore (if secrets configured)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+      - name: Setup release keystore
         working-directory: ./smartstudy-ai-mobile-app
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+            echo "RELEASE_KEYSTORE_EXISTS=true" >> $GITHUB_ENV
+          else
+            echo "No keystore configured, using debug signing"
+            echo "RELEASE_KEYSTORE_EXISTS=false" >> $GITHUB_ENV
+          fi
 
       - name: Build APK (Release signed if keystore available)
         working-directory: ./smartstudy-ai-mobile-app/android
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          if [ -f "app/release.keystore" ]; then
+          if [ "$RELEASE_KEYSTORE_EXISTS" = "true" ]; then
             ./gradlew assembleRelease \
               -PMYAPP_UPLOAD_STORE_FILE=release.keystore \
-              -PMYAPP_UPLOAD_KEY_ALIAS=${{ secrets.KEY_ALIAS }} \
-              -PMYAPP_UPLOAD_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} \
-              -PMYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
+              -PMYAPP_UPLOAD_KEY_ALIAS="$KEY_ALIAS" \
+              -PMYAPP_UPLOAD_STORE_PASSWORD="$KEYSTORE_PASSWORD" \
+              -PMYAPP_UPLOAD_KEY_PASSWORD="$KEY_PASSWORD"
           else
             echo "Building with debug keystore (no release keystore configured)"
             ./gradlew assembleRelease
@@ -59,13 +70,17 @@ jobs:
 
       - name: Build AAB (App Bundle)
         working-directory: ./smartstudy-ai-mobile-app/android
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -f "app/release.keystore" ]; then
+          if [ "$RELEASE_KEYSTORE_EXISTS" = "true" ]; then
             ./gradlew bundleRelease \
               -PMYAPP_UPLOAD_STORE_FILE=release.keystore \
-              -PMYAPP_UPLOAD_KEY_ALIAS=${{ secrets.KEY_ALIAS }} \
-              -PMYAPP_UPLOAD_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} \
-              -PMYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
+              -PMYAPP_UPLOAD_KEY_ALIAS="$KEY_ALIAS" \
+              -PMYAPP_UPLOAD_STORE_PASSWORD="$KEYSTORE_PASSWORD" \
+              -PMYAPP_UPLOAD_KEY_PASSWORD="$KEY_PASSWORD"
           else
             ./gradlew bundleRelease
           fi
