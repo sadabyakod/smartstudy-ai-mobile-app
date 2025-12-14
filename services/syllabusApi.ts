@@ -234,7 +234,6 @@ export async function uploadSyllabus(
     
     return await response.json();
   } catch (error) {
-    console.error('Upload syllabus error:', error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
@@ -250,7 +249,6 @@ export async function getTextbooks(): Promise<TextbooksResponse> {
     
     return await response.json();
   } catch (error) {
-    console.error('Get textbooks error:', error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }

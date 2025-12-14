@@ -190,7 +190,6 @@ export default function PUCExamScreen() {
       setAnswerSheetImages([]);
       setScreenState("exam");
     } catch (error: any) {
-      console.error("Generation error:", error);
       const message = getUserFriendlyErrorMessage(error) || ERROR_MESSAGES.UNKNOWN_ERROR;
       setErrorMessage(message);
       
@@ -493,7 +492,7 @@ export default function PUCExamScreen() {
             setEvaluationStatus(finalStatus);
           }
         } catch (pollError) {
-          console.error("Polling error:", pollError);
+          // Polling failed silently, status will be checked on next refresh
         }
         return; // Exit here, results will be shown from evaluating screen
       }
@@ -513,8 +512,6 @@ export default function PUCExamScreen() {
       
       setScreenState("results");
     } catch (error: any) {
-      console.error("Submit exam error:", error);
-      
       // Handle 409 Conflict - duplicate submission
       if (error?.status === 409) {
         Alert.alert(
@@ -1506,8 +1503,6 @@ export default function PUCExamScreen() {
         );
         
       } catch (error: any) {
-        console.error("Submit error:", error);
-        
         // Handle 409 Conflict - duplicate submission
         if (error?.status === 409) {
           Alert.alert(
@@ -1692,7 +1687,6 @@ export default function PUCExamScreen() {
           setScore(status.result.grandScore || 0);
         }
       } catch (error) {
-        console.error("Check status error:", error);
         setSubmissionStatus("Failed to check status. Please try again.");
       }
     };

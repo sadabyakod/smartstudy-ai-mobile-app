@@ -188,7 +188,6 @@ async function request<T>(
     if (error instanceof ApiError) {
       throw error;
     }
-    console.error("Exam API request error:", error);
     throw new ApiError(0, String(error), getUserFriendlyErrorMessage(error));
   }
 }

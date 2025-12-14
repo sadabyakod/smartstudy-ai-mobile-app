@@ -93,7 +93,6 @@ export async function getQuestionPapers(
     
     return await response.json();
   } catch (error) {
-    console.error('Get question papers error:', error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
@@ -137,7 +136,6 @@ export async function uploadQuestionPaper(
     
     return await response.json();
   } catch (error) {
-    console.error('Upload question paper error:', error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
@@ -154,7 +152,6 @@ export async function getAvailableSubjects(): Promise<string[]> {
     const data = await response.json();
     return data.subjects || [];
   } catch (error) {
-    console.error('Get subjects error:', error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
@@ -171,7 +168,6 @@ export async function getAvailableGrades(): Promise<string[]> {
     const data = await response.json();
     return data.grades || [];
   } catch (error) {
-    console.error('Get grades error:', error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
@@ -188,7 +184,6 @@ export async function getAvailableYears(): Promise<string[]> {
     const data = await response.json();
     return data.years || [];
   } catch (error) {
-    console.error('Get years error:', error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
@@ -206,7 +201,6 @@ export async function getQuestionPapersBySubject(
     
     return await response.json();
   } catch (error) {
-    console.error('Get question papers by subject error:', error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
@@ -224,7 +218,6 @@ export async function getQuestionPapersByGrade(
     
     return await response.json();
   } catch (error) {
-    console.error('Get question papers by grade error:', error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }
@@ -240,7 +233,6 @@ export async function downloadQuestionPaper(id: number): Promise<Blob> {
     
     return await response.blob();
   } catch (error) {
-    console.error('Download question paper error:', error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }

@@ -272,7 +272,6 @@ export async function getExamHistory(
     const history = await response.json();
     return history;
   } catch (error) {
-    console.error("Get history error:", error);
     throw new Error(getUserFriendlyErrorMessage(error));
   }
 }

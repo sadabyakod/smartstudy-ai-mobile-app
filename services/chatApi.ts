@@ -47,9 +47,9 @@ export async function sendChatMessage(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: payload.message,
-        language: payload.language ?? 'English',
-        sessionId: payload.sessionId ?? undefined,
+        Question: payload.message,
+        Language: payload.language ?? 'English',
+        SessionId: payload.sessionId ?? undefined,
       }),
     });
 
@@ -67,7 +67,6 @@ export async function sendChatMessage(
       return { reply: raw };
     }
   } catch (error) {
-    console.error("Chat API error:", error);
     return { reply: getUserFriendlyErrorMessage(error), error: "connection_error" };
   }
 }
@@ -84,7 +83,6 @@ export async function fetchMostRecentSessionId(): Promise<string | null> {
     }
     return data?.sessionId ?? null;
   } catch (error) {
-    console.error("Failed to fetch recent session:", error);
     return null;
   }
 }
@@ -96,7 +94,6 @@ export async function fetchChatHistory(
   try {
     const response = await fetchWithTimeout(CHAT_ENDPOINTS.history(sessionId, limit), {}, 15000);
     if (!response.ok) {
-      console.error("Failed to fetch chat history:", response.status);
       return [];
     }
     const data: ChatHistoryResponse = await response.json();
@@ -105,7 +102,6 @@ export async function fetchChatHistory(
     }
     return [];
   } catch (error) {
-    console.error("Chat history fetch error:", error);
     return [];
   }
 }

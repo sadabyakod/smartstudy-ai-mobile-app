@@ -7,7 +7,6 @@ import {
   ScrollView,
   StatusBar,
   Dimensions,
-  Platform,
   ActivityIndicator,
   Alert,
 } from "react-native";
@@ -15,34 +14,40 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { NavigationContext } from "../navigation/NavigationContext";
-import { checkSubmissionStatus, getExamResults, SubmissionStatusResponse } from "../services/pucExamApi";
+import { checkSubmissionStatus, SubmissionStatusResponse } from "../services/pucExamApi";
+import { 
+  SPACING, 
+  TYPOGRAPHY, 
+  COLORS as DESIGN_COLORS, 
+  RADIUS, 
+  ICON_SIZES 
+} from "../styles/designSystem";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // ============================================
-// DESIGN SYSTEM - Consistent spacing & typography
+// APP-SPECIFIC COLORS (extends design system)
 // ============================================
-
 const COLORS = {
   // Primary palette
-  primary: "#2563EB",
-  primaryLight: "#3B82F6",
-  primaryDark: "#1D4ED8",
+  primary: DESIGN_COLORS.primary[600],
+  primaryLight: DESIGN_COLORS.primary[500],
+  primaryDark: DESIGN_COLORS.primary[700],
 
   // Background colors
-  background: "#F8FAFC",
-  surface: "#FFFFFF",
+  background: DESIGN_COLORS.neutral[50],
+  surface: DESIGN_COLORS.neutral[0],
 
   // Text colors
-  textPrimary: "#0F172A",
-  textSecondary: "#475569",
-  textTertiary: "#94A3B8",
-  textInverse: "#FFFFFF",
+  textPrimary: DESIGN_COLORS.neutral[900],
+  textSecondary: DESIGN_COLORS.neutral[600],
+  textTertiary: DESIGN_COLORS.neutral[400],
+  textInverse: DESIGN_COLORS.neutral[0],
 
   // Semantic colors
-  success: "#059669",
-  warning: "#D97706",
-  error: "#DC2626",
+  success: DESIGN_COLORS.success[600],
+  warning: DESIGN_COLORS.warning[600],
+  error: DESIGN_COLORS.error[600],
 
   // Feature gradients
   studyHelp: ["#7C3AED", "#9333EA"] as [string, string],
@@ -51,66 +56,44 @@ const COLORS = {
   modelPapers: ["#EA580C", "#F97316"] as [string, string],
 
   // Subject colors
-  mathematics: "#2563EB",
+  mathematics: DESIGN_COLORS.subjects.mathematics,
   physics: "#7C3AED",
-  chemistry: "#059669",
+  chemistry: DESIGN_COLORS.subjects.science,
   biology: "#16A34A",
-  english: "#EA580C",
-  computerScience: "#0891B2",
+  english: DESIGN_COLORS.subjects.english,
+  computerScience: DESIGN_COLORS.subjects.computer,
 
   // Border & divider
-  border: "#E2E8F0",
-  divider: "#F1F5F9",
+  border: DESIGN_COLORS.neutral[200],
+  divider: DESIGN_COLORS.neutral[100],
 };
 
-const SPACING = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  xxxl: 32,
-  huge: 48,
-};
-
-const TYPOGRAPHY = {
-  // Headlines
-  h1: { fontSize: 24, fontWeight: "700" as const, lineHeight: 32 },
-  h2: { fontSize: 20, fontWeight: "600" as const, lineHeight: 28 },
-  h3: { fontSize: 18, fontWeight: "600" as const, lineHeight: 26 },
-
-  // Titles
-  titleLarge: { fontSize: 16, fontWeight: "600" as const, lineHeight: 24 },
-  titleMedium: { fontSize: 15, fontWeight: "500" as const, lineHeight: 22 },
-  titleSmall: { fontSize: 14, fontWeight: "500" as const, lineHeight: 20 },
-
-  // Body text
-  bodyLarge: { fontSize: 16, fontWeight: "400" as const, lineHeight: 24 },
-  bodyMedium: { fontSize: 14, fontWeight: "400" as const, lineHeight: 22 },
-  bodySmall: { fontSize: 13, fontWeight: "400" as const, lineHeight: 20 },
-
-  // Labels & captions
-  labelMedium: { fontSize: 12, fontWeight: "500" as const, lineHeight: 18 },
-  caption: { fontSize: 12, fontWeight: "400" as const, lineHeight: 16 },
-};
-
-const RADIUS = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  full: 999,
-};
-
+// Icon size mapping for local use
 const ICON_SIZE = {
-  sm: 20,
-  md: 24,
-  lg: 28,
-  xl: 32,
+  sm: ICON_SIZES.sm,
+  md: ICON_SIZES.md,
+  lg: ICON_SIZES.lg,
+  xl: ICON_SIZES.xl,
 };
 
 const CARD_WIDTH = (SCREEN_WIDTH - SPACING.xxl * 2 - SPACING.md) / 2;
+
+// ============================================
+// TYPOGRAPHY SHORTCUTS
+// ============================================
+const TEXT = {
+  h1: { fontSize: TYPOGRAPHY.displaySmall.fontSize, fontWeight: TYPOGRAPHY.displaySmall.fontWeight, lineHeight: TYPOGRAPHY.displaySmall.lineHeight },
+  h2: { fontSize: TYPOGRAPHY.headlineMedium.fontSize, fontWeight: TYPOGRAPHY.headlineMedium.fontWeight, lineHeight: TYPOGRAPHY.headlineMedium.lineHeight },
+  h3: { fontSize: TYPOGRAPHY.headlineSmall.fontSize, fontWeight: TYPOGRAPHY.headlineSmall.fontWeight, lineHeight: TYPOGRAPHY.headlineSmall.lineHeight },
+  titleLarge: TYPOGRAPHY.titleLarge,
+  titleMedium: TYPOGRAPHY.titleMedium,
+  titleSmall: TYPOGRAPHY.titleSmall,
+  bodyLarge: TYPOGRAPHY.bodyLarge,
+  bodyMedium: TYPOGRAPHY.bodyMedium,
+  bodySmall: TYPOGRAPHY.bodySmall,
+  labelMedium: TYPOGRAPHY.labelMedium,
+  caption: TYPOGRAPHY.caption,
+};
 
 // ============================================
 // COMPONENT DATA
@@ -199,8 +182,6 @@ export default function LearningHub() {
         }
       }
     } catch (error: any) {
-      console.error("Check status error:", error);
-      
       // Check if submission not found - clear the pending evaluation
       const errorMessage = error?.message || error?.userMessage || error?.toString() || "";
       if (errorMessage.toLowerCase().includes("not found") || 
@@ -493,11 +474,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    ...TYPOGRAPHY.h1,
+    ...TEXT.h1,
     color: COLORS.textInverse,
   },
   headerSubtitle: {
-    ...TYPOGRAPHY.bodyMedium,
+    ...TEXT.bodyMedium,
     color: "rgba(255, 255, 255, 0.8)",
     marginTop: SPACING.xs,
   },
@@ -543,12 +524,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   welcomeTitle: {
-    ...TYPOGRAPHY.titleLarge,
+    ...TEXT.titleLarge,
     color: COLORS.textPrimary,
     marginBottom: SPACING.xs,
   },
   welcomeText: {
-    ...TYPOGRAPHY.bodySmall,
+    ...TEXT.bodySmall,
     color: COLORS.textSecondary,
   },
 
@@ -560,11 +541,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   sectionTitle: {
-    ...TYPOGRAPHY.h3,
+    ...TEXT.h3,
     color: COLORS.textPrimary,
   },
   sectionSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
+    ...TEXT.bodySmall,
     color: COLORS.textTertiary,
     marginTop: SPACING.xs,
   },
@@ -603,12 +584,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   featureTitle: {
-    ...TYPOGRAPHY.titleMedium,
+    ...TEXT.titleMedium,
     color: COLORS.textPrimary,
     marginBottom: SPACING.xs,
   },
   featureDescription: {
-    ...TYPOGRAPHY.caption,
+    ...TEXT.caption,
     color: COLORS.textSecondary,
     flex: 1,
   },
@@ -658,11 +639,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   subjectName: {
-    ...TYPOGRAPHY.titleSmall,
+    ...TEXT.titleSmall,
     color: COLORS.textPrimary,
   },
   subjectMeta: {
-    ...TYPOGRAPHY.caption,
+    ...TEXT.caption,
     color: COLORS.textTertiary,
     marginTop: 2,
   },
@@ -689,11 +670,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statValue: {
-    ...TYPOGRAPHY.h2,
+    ...TEXT.h2,
     color: COLORS.primary,
   },
   statLabel: {
-    ...TYPOGRAPHY.caption,
+    ...TEXT.caption,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
   },
@@ -738,17 +719,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   evaluationTitle: {
-    ...TYPOGRAPHY.titleLarge,
+    ...TEXT.titleLarge,
     color: COLORS.textInverse,
     marginBottom: SPACING.xs,
   },
   evaluationSubject: {
-    ...TYPOGRAPHY.titleMedium,
+    ...TEXT.titleMedium,
     color: "rgba(255, 255, 255, 0.9)",
     marginBottom: SPACING.xs,
   },
   evaluationStatus: {
-    ...TYPOGRAPHY.bodySmall,
+    ...TEXT.bodySmall,
     color: "rgba(255, 255, 255, 0.8)",
   },
   checkStatusButton: {
@@ -762,7 +743,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   checkStatusText: {
-    ...TYPOGRAPHY.titleMedium,
+    ...TEXT.titleMedium,
     color: "#6366F1",
     marginLeft: SPACING.sm,
   },
@@ -771,7 +752,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   dismissText: {
-    ...TYPOGRAPHY.bodySmall,
+    ...TEXT.bodySmall,
     color: "rgba(255, 255, 255, 0.7)",
   },
 

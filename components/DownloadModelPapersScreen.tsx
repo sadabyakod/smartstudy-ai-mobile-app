@@ -106,7 +106,6 @@ export default function DownloadModelPapersScreen() {
         setError("No model papers available");
       }
     } catch (err: any) {
-      console.error("Failed to load question papers:", err);
       setError(err.message || "Failed to load model papers");
     } finally {
       setLoading(false);

@@ -76,7 +76,6 @@ export default function SyllabusScreen() {
         setError("No textbooks available");
       }
     } catch (err: any) {
-      console.error("Failed to load subjects:", err);
       setError(err.message || "Failed to load textbooks");
     } finally {
       setLoading(false);
