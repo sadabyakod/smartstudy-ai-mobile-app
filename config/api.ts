@@ -73,3 +73,19 @@ export const EXAM_ENDPOINTS = {
   getHistory: (studentId: string) =>
     `${API_BASE_URL}/api/exam/history?studentId=${encodeURIComponent(studentId)}`,
 } as const;
+
+export const SYLLABUS_ENDPOINTS = {
+  upload: `${API_BASE_URL}/api/file/upload`,
+  listTextbooks: `${API_BASE_URL}/api/test/blobs/textbooks`,
+} as const;
+
+export const QUESTION_PAPER_ENDPOINTS = {
+  list: `${API_BASE_URL}/api/questionpapers`,
+  upload: `${API_BASE_URL}/api/questionpapers/upload`,
+  subjects: `${API_BASE_URL}/api/questionpapers/subjects`,
+  grades: `${API_BASE_URL}/api/questionpapers/grades`,
+  years: `${API_BASE_URL}/api/questionpapers/years`,
+  bySubject: (subject: string) => `${API_BASE_URL}/api/questionpapers/subject/${encodeURIComponent(subject)}`,
+  byGrade: (grade: string) => `${API_BASE_URL}/api/questionpapers/grade/${encodeURIComponent(grade)}`,
+  download: (id: number) => `${API_BASE_URL}/api/questionpapers/download/${id}`,
+} as const;
