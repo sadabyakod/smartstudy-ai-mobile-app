@@ -1,4 +1,4 @@
-import { ActivityIndicator, Dimensions, findNodeHandle, Linking } from "react-native";
+import { ActivityIndicator, Dimensions, findNodeHandle, Linking, Share, Alert, Modal } from "react-native";
 import React, { useReducer, useRef, useEffect, useState, useContext } from "react";
 import {
   View,
@@ -13,6 +13,7 @@ import {
   Keyboard,
   Animated,
 } from "react-native";
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -91,9 +92,14 @@ export default function ChatScreen() {
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editText, setEditText] = useState("");
+  
   type ChatAction =
     | { type: "add"; payload: ChatMessage }
-    | { type: "set"; payload: ChatMessage[] };
+    | { type: "set"; payload: ChatMessage[] }
+    | { type: "update"; payload: { id: string; text: string } };
 
   const [messages, dispatch] = useReducer((state: ChatMessage[], action: ChatAction) => {
     switch (action.type) {
@@ -101,6 +107,10 @@ export default function ChatScreen() {
         return [...state, action.payload];
       case "set":
         return Array.isArray(action.payload) ? action.payload : state;
+      case "update":
+        return state.map((msg) =>
+          msg.id === action.payload.id ? { ...msg, text: action.payload.text } : msg
+        );
       default:
         return state;
     }
@@ -298,6 +308,134 @@ export default function ChatScreen() {
 
   const handleMicPress = () => {
     alert("🎙️ Voice input coming soon!");
+  };
+
+  const handleCopy = async (text: string) => {
+    try {
+      await Clipboard.setStringAsync(text);
+    } catch (error) {
+      // Silent fail
+    }
+  };
+
+  const handleShare = async (text: string, messageId?: string) => {
+    try {
+      let shareContent = '';
+      
+      if (messageId) {
+        // Find the message index
+        const messageIndex = messages.findIndex(m => m.id === messageId);
+        
+        if (messageIndex >= 0) {
+          const currentMessage = messages[messageIndex];
+          
+          if (currentMessage.sender === 'bot' && messageIndex > 0) {
+            // Sharing a bot message - include the previous user question + bot response
+            const userMessage = messages[messageIndex - 1];
+            shareContent = `${userMessage.text}\n\n${currentMessage.text}`;
+          } else if (currentMessage.sender === 'user' && messageIndex < messages.length - 1) {
+            // Sharing a user message - include user message + next bot response (if exists)
+            const nextMessage = messages[messageIndex + 1];
+            if (nextMessage && nextMessage.sender === 'bot') {
+              shareContent = `${currentMessage.text}\n\n${nextMessage.text}`;
+            } else {
+              shareContent = text;
+            }
+          } else {
+            // Just share the single message
+            shareContent = text;
+          }
+        } else {
+          shareContent = text;
+        }
+      } else {
+        shareContent = text;
+      }
+      
+      await Share.share({ message: shareContent });
+    } catch (error) {
+      Alert.alert("Error", "Failed to share");
+    }
+  };
+
+  const handleEditMessage = (messageId: string, currentText: string) => {
+    setEditingMessageId(messageId);
+    setEditText(currentText);
+    setEditModalVisible(true);
+  };
+
+  const handleSendEditedMessage = async () => {
+    if (!editingMessageId || !editText.trim()) return;
+
+    const finalText = editText.trim();
+    
+    // Close modal
+    setEditModalVisible(false);
+    
+    // Update the existing message
+    dispatch({ 
+      type: "update", 
+      payload: { id: editingMessageId, text: finalText } 
+    });
+    
+    // Clear edit state
+    setEditingMessageId(null);
+    setEditText("");
+    setFollowUpQuestion(null);
+    scrollToBottom();
+    setIsTyping(true);
+
+    // Send the edited message to get new response
+    try {
+      const response = await sendChatMessage({
+        message: finalText,
+        language: 'English',
+        sessionId,
+      });
+
+      if (response?.sessionId) {
+        setSessionId(response.sessionId);
+      }
+
+      const answer = response?.reply || response?.answer || "No response from server.";
+      
+      if (response?.followUpQuestion) {
+        setFollowUpQuestion(response.followUpQuestion);
+      } else {
+        setFollowUpQuestion(null);
+      }
+
+      const botMsg = {
+        id: `${Date.now()}-${Math.random()}`,
+        text: answer,
+        sender: "bot" as const,
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+
+      setTimeout(() => {
+        dispatch({ type: "add", payload: botMsg });
+        setIsTyping(false);
+        fadeIn();
+        scrollToBottom();
+      }, 800);
+    } catch {
+      setIsTyping(false);
+      const errorMsg = {
+        id: `${Date.now()}-${Math.random()}`,
+        text: "😔 Oops! We couldn't connect to our servers right now.\n\nPlease check your internet connection and try again.",
+        sender: "bot" as const,
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+      dispatch({ type: "add", payload: errorMsg });
+      fadeIn();
+      scrollToBottom();
+    }
   };
 
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -526,17 +664,38 @@ export default function ChatScreen() {
                       end={{ x: 1, y: 1 }}
                       style={styles.userBubble}
                     >
-                      <Text style={styles.userText}>{item.text}</Text>
-                      <Text style={[styles.timeText, styles.userTimeText]}>
-                        {item.time}
-                      </Text>
+                      <TouchableOpacity 
+                        onLongPress={() => handleEditMessage(item.id, item.text)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.userText}>{item.text}</Text>
+                        <Text style={[styles.timeText, styles.userTimeText]}>
+                          {item.time}
+                        </Text>
+                      </TouchableOpacity>
                     </LinearGradient>
+                    <View style={styles.actionBar}>
+                      <TouchableOpacity onPress={() => handleCopy(item.text)} style={styles.actionButton}>
+                        <Ionicons name="copy-outline" size={16} color="#666" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleShare(item.text, item.id)} style={styles.actionButton}>
+                        <Ionicons name="share-outline" size={16} color="#666" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ) : (
                   <View style={styles.botMessageWrapper}>
                     <View style={styles.botBubble}>
                       <Text style={styles.botText}>{item.text}</Text>
                       <Text style={styles.timeText}>{item.time}</Text>
+                    </View>
+                    <View style={styles.actionBar}>
+                      <TouchableOpacity onPress={() => handleCopy(item.text)} style={styles.actionButton}>
+                        <Ionicons name="copy-outline" size={16} color="#666" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleShare(item.text, item.id)} style={styles.actionButton}>
+                        <Ionicons name="share-outline" size={16} color="#666" />
+                      </TouchableOpacity>
                     </View>
                   </View>
                 )}
@@ -577,6 +736,50 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* EDIT MODAL */}
+          <Modal
+            visible={editModalVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => {
+              setEditModalVisible(false);
+              setEditingMessageId(null);
+              setEditText("");
+            }}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.editModalContainer}>
+                <TextInput
+                  style={styles.editModalInput}
+                  value={editText}
+                  onChangeText={setEditText}
+                  multiline
+                  autoFocus
+                  placeholder="Edit your message..."
+                />
+                <View style={styles.editModalButtons}>
+                  <TouchableOpacity 
+                    style={styles.editModalCancelButton}
+                    onPress={() => {
+                      setEditModalVisible(false);
+                      setEditingMessageId(null);
+                      setEditText("");
+                    }}
+                  >
+                    <Text style={styles.editModalCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.editModalSendButton}
+                    onPress={handleSendEditedMessage}
+                  >
+                    <Ionicons name="paper-plane" size={18} color="#fff" />
+                    <Text style={styles.editModalSendText}>Send</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           {/* INPUT */}
           <View style={styles.inputWrapper}>
@@ -689,6 +892,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
   },
+  shareConversationButton: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+    marginRight: 8,
+  },
   examButtonText: {
     color: "#fff",
     fontSize: 13,
@@ -720,14 +931,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     color: "#2563EB",
     fontSize: 13,
-    fontWeight: "600",
-  },
-  messagesContainer: {
-    flexGrow: 1,
-    paddingHorizontal: 12,
-    paddingBottom: 15,
-  },
-  chatBotImage: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -833,5 +1036,76 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 10,
     marginLeft: 4,
+  },
+  actionBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+    paddingHorizontal: 8,
+  },
+  actionButton: {
+    padding: 4,
+    marginRight: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  editModalContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 20,
+    width: "100%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  editModalInput: {
+    fontSize: 16,
+    color: "#333",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 12,
+    padding: 12,
+    minHeight: 80,
+    maxHeight: 200,
+    backgroundColor: "#F9FAFB",
+    marginBottom: 16,
+  },
+  editModalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  editModalCancelButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+  },
+  editModalCancelText: {
+    color: "#6B7280",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  editModalSendButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "#2563EB",
+  },
+  editModalSendText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

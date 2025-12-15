@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Study Assistant",
-    "slug": "smartstudyaichatbot",
+    "slug": "studyassistant",
     "version": "11",
     "android": {
       "package": "com.sadashivbyakod.smartstudyaichatbot",
@@ -15,8 +15,9 @@
     },
     "updates": {
       "enabled": false,
-      "checkAutomatically": "never",
-      "fallbackToCacheTimeout": 0
+      "checkAutomatically": "ON_ERROR_RECOVERY",
+      "fallbackToCacheTimeout": 0,
+      "url": ""
     },
     "extra": {
       "eas": {

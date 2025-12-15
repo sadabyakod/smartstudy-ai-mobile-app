@@ -1,7 +1,6 @@
-// Production URL
 export const API_BASE_URL = "https://smartstudy-api-athtbtapcvdjesbe.centralindia-01.azurewebsites.net";
-// Local Development URL: http://localhost:8080
-// Old Azure URL: https://smartstudy-api-athtbtapcvdjesbe.centralindia-01.azurewebsites.net
+// Local URL: http://192.168.1.77:8080
+// Azure URL: https://smartstudy-api-athtbtapcvdjesbe.centralindia-01.azurewebsites.net
 
 // User-friendly error messages
 export const ERROR_MESSAGES = {
@@ -66,34 +65,11 @@ export const CHAT_ENDPOINTS = {
 
 export const EXAM_ENDPOINTS = {
   createTemplate: `${API_BASE_URL}/api/exam/templates`,
-  startExam: `${API_BASE_URL}/api/exams/start`,
+  startExam: `${API_BASE_URL}/api/exam/start`,
   submitAnswer: (attemptId: number | string) =>
-    `${API_BASE_URL}/api/exams/answer`,
+    `${API_BASE_URL}/api/exam/${attemptId}/answer`,
   getSummary: (attemptId: number | string) =>
-    `${API_BASE_URL}/api/exams/results/${attemptId}`,
+    `${API_BASE_URL}/api/exam/${attemptId}/summary`,
   getHistory: (studentId: string) =>
     `${API_BASE_URL}/api/exam/history?studentId=${encodeURIComponent(studentId)}`,
-} as const;
-
-export const SYLLABUS_ENDPOINTS = {
-  upload: `${API_BASE_URL}/api/file/upload`,
-  listTextbooks: `${API_BASE_URL}/api/test/blobs/textbooks`,
-} as const;
-
-export const QUESTION_PAPER_ENDPOINTS = {
-  list: `${API_BASE_URL}/api/questionpapers`,
-  upload: `${API_BASE_URL}/api/questionpapers/upload`,
-  subjects: `${API_BASE_URL}/api/questionpapers/subjects`,
-  grades: `${API_BASE_URL}/api/questionpapers/grades`,
-  years: `${API_BASE_URL}/api/questionpapers/years`,
-  bySubject: (subject: string) => `${API_BASE_URL}/api/questionpapers/subject/${encodeURIComponent(subject)}`,
-  byGrade: (grade: string) => `${API_BASE_URL}/api/questionpapers/grade/${encodeURIComponent(grade)}`,
-  download: (id: number) => `${API_BASE_URL}/api/questionpapers/download/${id}`,
-} as const;
-
-export const TEST_ENDPOINTS = {
-  ping: `${API_BASE_URL}/api/simple/ping`,
-  dbConnection: `${API_BASE_URL}/api/test/db-connection`,
-  textbooks: `${API_BASE_URL}/api/test/blobs/textbooks`,
-  modelQuestions: `${API_BASE_URL}/api/test/blobs/model-questions`,
 } as const;
