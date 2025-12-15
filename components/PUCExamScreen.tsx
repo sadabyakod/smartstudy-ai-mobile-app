@@ -2002,6 +2002,8 @@ export default function PUCExamScreen() {
                   const maxMarks = result.maxMarks ?? 0;
                   const scorePercent = maxMarks > 0 ? (scoreEarned / maxMarks) * 100 : 0;
                   const scoreColor = scorePercent >= 80 ? '#22C55E' : scorePercent >= 60 ? '#F97316' : '#EF4444';
+                  // Use API's isFullyCorrect field or fallback to percentage check
+                  const isIncomplete = (result.isFullyCorrect === false) || (scorePercent < 100 && result.expectedAnswer);
                   
                   return (
                     <View key={result.questionId || index} style={styles.subjectiveResultCard}>
@@ -2014,6 +2016,16 @@ export default function PUCExamScreen() {
                           <Text style={styles.scoreBadgeText}>{scoreEarned}/{maxMarks}</Text>
                         </View>
                       </View>
+
+                      {/* Incomplete Answer Indicator */}
+                      {isIncomplete && (
+                        <View style={styles.incompleteAnswerBanner}>
+                          <Ionicons name="warning" size={16} color="#D97706" />
+                          <Text style={styles.incompleteAnswerText}>
+                            Incomplete - See expected answer below
+                          </Text>
+                        </View>
+                      )}
                       
                       {/* Question Text */}
                       {result.questionText && (
@@ -2032,16 +2044,59 @@ export default function PUCExamScreen() {
                       </View>
                       
                       {/* Student's Answer (extracted from image) */}
-                      {result.studentAnswer && (
+                      {(result.studentAnswer || result.studentAnswerEcho) && (
                         <View style={styles.studentAnswerSection}>
                           <Text style={styles.sectionLabel}>📝 Your Answer:</Text>
-                          <Text style={styles.studentAnswerText}>{result.studentAnswer}</Text>
+                          <Text style={styles.studentAnswerText}>{result.studentAnswer || result.studentAnswerEcho}</Text>
+                        </View>
+                      )}
+
+                      {/* Step Analysis if available - PRIORITIZED for step-wise marks */}
+                      {result.stepAnalysis && result.stepAnalysis.length > 0 && (
+                        <View style={styles.stepAnalysisSection}>
+                          <Text style={styles.sectionLabel}>📊 Step-by-Step Marking:</Text>
+                          {result.stepAnalysis.map((step: any, stepIndex: number) => {
+                            // Handle both API field names: marks/marksAwarded and maxMarks/maxMarksForStep
+                            const stepMarks = step.marksAwarded ?? step.marks ?? 0;
+                            const stepMaxMarks = step.maxMarksForStep ?? step.maxMarks;
+                            const stepNum = step.step ?? step.stepNumber ?? (stepIndex + 1);
+                            const isStepCorrect = step.isCorrect !== false && stepMarks > 0;
+                            
+                            return (
+                              <View key={stepIndex} style={[
+                                styles.stepItem,
+                                { backgroundColor: isStepCorrect ? '#F0FDF4' : '#FEF2F2' }
+                              ]}>
+                                <View style={styles.stepHeader}>
+                                  <Ionicons 
+                                    name={isStepCorrect ? "checkmark-circle" : "close-circle"} 
+                                    size={18} 
+                                    color={isStepCorrect ? '#22C55E' : '#EF4444'} 
+                                  />
+                                  <Text style={styles.stepText}>
+                                    Step {stepNum}: {step.description || step.feedback || 'Step analysis'}
+                                  </Text>
+                                </View>
+                                <View style={styles.stepMarksContainer}>
+                                  <Text style={[styles.stepMarks, { color: isStepCorrect ? '#22C55E' : '#EF4444' }]}>
+                                    {stepMarks > 0 ? '+' : ''}{stepMarks}{stepMaxMarks ? `/${stepMaxMarks}` : ''} marks
+                                  </Text>
+                                </View>
+                                {step.feedback && step.feedback !== step.description && (
+                                  <Text style={styles.stepFeedback}>{step.feedback}</Text>
+                                )}
+                              </View>
+                            );
+                          })}
                         </View>
                       )}
                       
-                      {/* Expected Answer */}
+                      {/* Expected Answer - Show prominently if incomplete */}
                       {result.expectedAnswer && (
-                        <View style={styles.expectedAnswerSection}>
+                        <View style={[
+                          styles.expectedAnswerSection,
+                          isIncomplete && styles.expectedAnswerHighlighted
+                        ]}>
                           <Text style={styles.sectionLabel}>✅ Expected Answer:</Text>
                           <Text style={styles.expectedAnswerText}>{result.expectedAnswer}</Text>
                         </View>
@@ -2052,25 +2107,6 @@ export default function PUCExamScreen() {
                         <View style={styles.improvementSection}>
                           <Text style={styles.improvementLabel}>💡 Suggestions for Improvement:</Text>
                           <Text style={styles.improvementText}>{result.improvementSuggestions}</Text>
-                        </View>
-                      )}
-                      
-                      {/* Step Analysis if available */}
-                      {result.stepAnalysis && result.stepAnalysis.length > 0 && (
-                        <View style={styles.stepAnalysisSection}>
-                          <Text style={styles.sectionLabel}>📊 Step-by-Step Analysis:</Text>
-                          {result.stepAnalysis.map((step: any, stepIndex: number) => (
-                            <View key={stepIndex} style={styles.stepItem}>
-                              <Text style={styles.stepText}>
-                                Step {stepIndex + 1}: {step.description || step.feedback || JSON.stringify(step)}
-                              </Text>
-                              {step.marks !== undefined && (
-                                <Text style={[styles.stepMarks, { color: step.marks > 0 ? '#22C55E' : '#EF4444' }]}>
-                                  +{step.marks} marks
-                                </Text>
-                              )}
-                            </View>
-                          ))}
                         </View>
                       )}
                     </View>
@@ -3470,25 +3506,61 @@ const styles = StyleSheet.create({
     backgroundColor: "#EEF2FF",
     borderRadius: 8,
     padding: 12,
+    marginBottom: 12,
   },
   stepItem: {
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  stepHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#C7D2FE",
+    alignItems: "flex-start",
   },
   stepText: {
     flex: 1,
     fontSize: 13,
-    color: "#3730A3",
+    color: "#374151",
     lineHeight: 18,
+    marginLeft: 8,
+  },
+  stepMarksContainer: {
+    marginTop: 6,
+    alignItems: 'flex-end',
   },
   stepMarks: {
     fontSize: 13,
     fontWeight: "bold",
+  },
+  stepFeedback: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontStyle: "italic",
+    marginTop: 4,
+    marginLeft: 26,
+  },
+  incompleteAnswerBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF3C7",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+  },
+  incompleteAnswerText: {
+    fontSize: 13,
+    color: "#D97706",
+    fontWeight: "600",
     marginLeft: 8,
+  },
+  expectedAnswerHighlighted: {
+    backgroundColor: "#FEF3C7",
+    borderColor: "#FCD34D",
+    borderWidth: 2,
   },
   
   // MCQ Results Styles

@@ -114,6 +114,19 @@ export interface McqQuestionResult {
   marks: number;
 }
 
+// Step-by-step analysis for subjective answers (matches API response)
+export interface StepAnalysisItem {
+  step?: number;           // Step number from API
+  stepNumber?: number;     // Alternative field name
+  description: string;
+  isCorrect?: boolean;
+  marks?: number;          // Alternative field name
+  marksAwarded?: number;   // API field name
+  maxMarks?: number;       // Alternative field name
+  maxMarksForStep?: number; // API field name
+  feedback?: string;
+}
+
 export interface SubjectiveResult {
   questionId: string;
   questionNumber: number;
@@ -121,17 +134,21 @@ export interface SubjectiveResult {
   earnedMarks: number;
   maxMarks: number;
   score?: number; // Alternative name for earnedMarks
+  isFullyCorrect?: boolean; // From API - true if answer is complete
   expectedAnswer: string;
   studentAnswer?: string;
-  stepAnalysis?: any[];
+  studentAnswerEcho?: string; // API field for extracted student answer
+  stepAnalysis?: StepAnalysisItem[];
   overallFeedback: string;
   feedback?: string; // Alternative name for overallFeedback
   improvementSuggestions?: string;
+  isComplete?: boolean; // Indicates if answer was fully complete
 }
 
 export interface ExamResult {
   examId: string;
   studentId: string;
+  examTitle?: string; // From API
   mcqScore: number;
   mcqTotalMarks: number;
   subjectiveScore: number;
@@ -141,6 +158,7 @@ export interface ExamResult {
   percentage: number;
   grade: string;
   passed: boolean;
+  evaluatedAt?: string; // From API
   mcqResults?: McqQuestionResult[];
   subjectiveResults: SubjectiveResult[];
 }
