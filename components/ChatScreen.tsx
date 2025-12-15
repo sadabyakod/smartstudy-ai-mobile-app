@@ -99,7 +99,8 @@ export default function ChatScreen() {
   type ChatAction =
     | { type: "add"; payload: ChatMessage }
     | { type: "set"; payload: ChatMessage[] }
-    | { type: "update"; payload: { id: string; text: string } };
+    | { type: "update"; payload: { id: string; text: string } }
+    | { type: "updateAndRemoveAfter"; payload: { id: string; text: string } };
 
   const [messages, dispatch] = useReducer((state: ChatMessage[], action: ChatAction) => {
     switch (action.type) {
@@ -111,6 +112,13 @@ export default function ChatScreen() {
         return state.map((msg) =>
           msg.id === action.payload.id ? { ...msg, text: action.payload.text } : msg
         );
+      case "updateAndRemoveAfter":
+        const index = state.findIndex((msg) => msg.id === action.payload.id);
+        if (index === -1) return state;
+        // Update the message and remove all messages after it
+        const updatedMessages = state.slice(0, index + 1);
+        updatedMessages[index] = { ...updatedMessages[index], text: action.payload.text };
+        return updatedMessages;
       default:
         return state;
     }
@@ -372,9 +380,9 @@ export default function ChatScreen() {
     // Close modal
     setEditModalVisible(false);
     
-    // Update the existing message
+    // Update the message and remove all messages after it (old bot responses)
     dispatch({ 
-      type: "update", 
+      type: "updateAndRemoveAfter", 
       payload: { id: editingMessageId, text: finalText } 
     });
     
