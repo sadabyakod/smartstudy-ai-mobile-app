@@ -14,7 +14,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { NavigationContext } from "../navigation/NavigationContext";
-import { checkSubmissionStatus, SubmissionStatusResponse } from "../services/pucExamApi";
+import { checkSubmissionStatus, SubmissionStatusResponse, isEvaluationComplete, isEvaluationFailed } from "../services/pucExamApi";
+import { getEvaluationResultsBySubmissionId } from "../services/answerSheetApi";
 import { 
   SPACING, 
   TYPOGRAPHY, 
@@ -110,9 +111,17 @@ const subjects = [
 
 // ============================================
 // EVALUATION STATUS CONFIG
+// Status codes: 0=Uploaded, 1=OCR Complete, 2=Evaluation Complete, 3=OCR Failed, 4=Evaluation Failed
 // ============================================
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { icon: string; color: string; message: string }> = {
+  // Numeric status codes from API
+  "0": { icon: "⏳", color: "#F59E0B", message: "Uploaded. Waiting for OCR..." },
+  "1": { icon: "📄", color: "#3B82F6", message: "OCR Complete. Evaluation starting..." },
+  "2": { icon: "✅", color: "#10B981", message: "Evaluation completed! Your results are ready." },
+  "3": { icon: "❌", color: "#EF4444", message: "OCR Failed. Please upload clearer images." },
+  "4": { icon: "❌", color: "#EF4444", message: "Evaluation failed. Please contact support." },
+  // Legacy status names (backward compatibility)
   PendingEvaluation: { icon: "⏳", color: "#F59E0B", message: "Your answer sheet is being processed..." },
   OcrProcessing: { icon: "📄", color: "#3B82F6", message: "Extracting text from your answer sheet..." },
   Evaluating: { icon: "🤖", color: "#8B5CF6", message: "AI is evaluating your answers..." },
@@ -125,61 +134,77 @@ const STATUS_CONFIG = {
 // ============================================
 
 export default function LearningHub() {
-  const { navigate, pendingEvaluation, setPendingEvaluation } = useContext(NavigationContext);
+  const { navigate, pendingEvaluation, setPendingEvaluation, setCompletedEvaluation } = useContext(NavigationContext);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [evaluationStatus, setEvaluationStatus] = useState<SubmissionStatusResponse | null>(null);
 
   // Get current status config
   const getCurrentStatusConfig = () => {
     const status = evaluationStatus?.status || "PendingEvaluation";
-    return STATUS_CONFIG[status] || STATUS_CONFIG.PendingEvaluation;
+    return STATUS_CONFIG[status] || STATUS_CONFIG["0"];
   };
 
   const handleCheckStatus = async () => {
     if (!pendingEvaluation) return;
     
+    console.log('🔍 [LearningHub] Checking status for submission:', pendingEvaluation.writtenSubmissionId);
     setIsCheckingStatus(true);
     try {
       const status = await checkSubmissionStatus(pendingEvaluation.writtenSubmissionId);
+      console.log('🔍 [LearningHub] Status response:', JSON.stringify(status));
       setEvaluationStatus(status);
       
-      if (status.isComplete) {
-        if (status.status === "Completed" && status.result) {
-          Alert.alert(
-            "✅ Evaluation Complete!",
-            `Your score: ${status.result.grandScore}/${status.result.grandTotalMarks} (${status.result.percentage.toFixed(1)}%)\nGrade: ${status.result.grade}`,
-            [
-              {
-                text: "View Details",
-                onPress: () => {
-                  // Navigate to PUC exam to show results
-                  navigate("puc-exam");
-                },
-              },
-              {
-                text: "Dismiss",
-                onPress: () => {
-                  setPendingEvaluation(null);
-                  setEvaluationStatus(null);
-                },
-              },
-            ]
-          );
-        } else if (status.status === "Failed") {
-          Alert.alert(
-            "❌ Evaluation Failed",
-            status.statusMessage || "There was an error evaluating your answer sheet. Please contact support.",
-            [
-              {
-                text: "Dismiss",
-                onPress: () => {
-                  setPendingEvaluation(null);
-                  setEvaluationStatus(null);
-                },
-              },
-            ]
-          );
+      // Check if evaluation is complete using helper function
+      // Status "2" = Evaluation Complete OR legacy "Completed" status
+      if (status.isComplete || isEvaluationComplete(status.status)) {
+        console.log('✅ [LearningHub] Evaluation complete! Fetching full results...');
+        // Fetch full results using new endpoint and auto-redirect to results
+        try {
+          const fullResults = await getEvaluationResultsBySubmissionId(pendingEvaluation.writtenSubmissionId);
+          console.log('✅ [LearningHub] Full results received! Navigating to results...');
+          // Set completed evaluation data and navigate to results screen
+          setCompletedEvaluation({
+            writtenSubmissionId: pendingEvaluation.writtenSubmissionId,
+            result: fullResults
+          });
+          setPendingEvaluation(null);
+          setEvaluationStatus(null);
+          navigate("puc-exam");
+        } catch (resultError: any) {
+          console.log('⚠️ [LearningHub] Failed to fetch full results:', resultError?.message);
+          // Fallback - still navigate to PUC exam to show results
+          if (status.result) {
+            console.log('🔄 [LearningHub] Using fallback result from status');
+            setCompletedEvaluation({
+              writtenSubmissionId: pendingEvaluation.writtenSubmissionId,
+              result: status.result
+            });
+            setPendingEvaluation(null);
+            setEvaluationStatus(null);
+            navigate("puc-exam");
+          }
         }
+      } else if (isEvaluationFailed(status.status)) {
+        console.log('❌ [LearningHub] Evaluation failed! Status:', status.status);
+        // Status "3" = OCR Failed, "4" = Evaluation Failed, or legacy "Failed"
+        const failureMessage = status.status === "3" 
+          ? "OCR failed. Please upload clearer images of your answer sheet."
+          : "Evaluation failed. Please contact support.";
+        Alert.alert(
+          "❌ Evaluation Failed",
+          status.statusMessage || failureMessage,
+          [
+            {
+              text: "Dismiss",
+              onPress: () => {
+                setPendingEvaluation(null);
+                setEvaluationStatus(null);
+              },
+            },
+          ]
+        );
+      } else {
+        console.log('⏳ [LearningHub] Still processing... Status:', status.status);
       }
     } catch (error: any) {
       // Check if submission not found - clear the pending evaluation

@@ -38,7 +38,10 @@ import {
   pollSubmissionStatus,
   checkSubmissionStatus,
   SubmissionStatusResponse,
+  isEvaluationComplete,
+  isEvaluationFailed,
 } from "../services/pucExamApi";
+import { getEvaluationResultsBySubmissionId } from "../services/answerSheetApi";
 import { API_BASE_URL, getUserFriendlyErrorMessage, ERROR_MESSAGES } from "../config/api";
 import { NavigationContext } from "../navigation/NavigationContext";
 
@@ -118,7 +121,7 @@ function McqResultItem({ mcqRes, styles }: { mcqRes: any; styles: any }) {
 }
 
 export default function PUCExamScreen() {
-  const { navigate, goBack, canGoBack, setPendingEvaluation } = useContext(NavigationContext);
+  const { navigate, goBack, canGoBack, setPendingEvaluation, completedEvaluation, setCompletedEvaluation } = useContext(NavigationContext);
   
   // Form state
   const [selectedSubject, setSelectedSubject] = useState(PUC_SUBJECTS[0]);
@@ -145,6 +148,20 @@ export default function PUCExamScreen() {
   const [evaluationStatus, setEvaluationStatus] = useState<SubmissionStatusResponse | null>(null);
   const [showDetailedResults, setShowDetailedResults] = useState(false);
 
+  // Check for completed evaluation from navigation (e.g., from LearningHub)
+  React.useEffect(() => {
+    if (completedEvaluation?.result) {
+      // Set the exam result from completed evaluation
+      setExamResult(completedEvaluation.result as any);
+      setScore(completedEvaluation.result.grandScore || 0);
+      setWrittenSubmissionId(completedEvaluation.writtenSubmissionId);
+      setShowDetailedResults(true);
+      setScreenState("results");
+      // Clear the completed evaluation after consuming it
+      setCompletedEvaluation(null);
+    }
+  }, [completedEvaluation]);
+
   const currentPart = generatedExam?.parts[currentPartIndex];
   const currentQuestion = currentPart?.questions[currentQuestionIndex];
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -159,6 +176,8 @@ export default function PUCExamScreen() {
 
   const handleGenerateExam = async () => {
     try {
+      console.log('📝 [GENERATE EXAM] Starting exam generation...');
+      console.log('📝 [GENERATE EXAM] Subject:', selectedSubject, 'Grade:', selectedGrade);
       setScreenState("loading");
       setErrorMessage(null);
       
@@ -169,6 +188,10 @@ export default function PUCExamScreen() {
         difficulty: "Medium", // Can be made dynamic later
         examType: "Full Paper", // Full Karnataka 2nd PUC paper
       });
+      
+      console.log('✅ [GENERATE EXAM] Exam generated successfully!');
+      console.log('📝 [GENERATE EXAM] Exam ID:', exam?.examId);
+      console.log('📝 [GENERATE EXAM] Parts count:', exam?.parts?.length);
       
       // Validate exam has parts and questions
       if (!exam || !exam.parts || exam.parts.length === 0) {
@@ -189,7 +212,9 @@ export default function PUCExamScreen() {
       setScore(0);
       setAnswerSheetImages([]);
       setScreenState("exam");
+      console.log('✅ [GENERATE EXAM] Navigated to exam screen');
     } catch (error: any) {
+      console.log('❌ [GENERATE EXAM] Error:', error?.message || error);
       const message = getUserFriendlyErrorMessage(error) || ERROR_MESSAGES.UNKNOWN_ERROR;
       setErrorMessage(message);
       
@@ -411,6 +436,9 @@ export default function PUCExamScreen() {
   const handleSubmitExam = async () => {
     if (!generatedExam) return;
     
+    console.log('📤 [SUBMIT EXAM] Starting submission...');
+    console.log('📤 [SUBMIT EXAM] Exam ID:', generatedExam.examId);
+    console.log('📤 [SUBMIT EXAM] Student ID:', studentId);
     setScreenState("submitting");
     
     try {
@@ -447,6 +475,9 @@ export default function PUCExamScreen() {
         }
       }
       
+      console.log('📤 [SUBMIT EXAM] MCQ answers count:', mcqAnswers.length);
+      console.log('📤 [SUBMIT EXAM] Written images count:', writtenImageUris.length);
+      
       if (mcqAnswers.length === 0 && writtenImageUris.length === 0) {
         Alert.alert(
           "No Answers",
@@ -460,38 +491,49 @@ export default function PUCExamScreen() {
       
       // Step 2: Submit MCQ answers if any
       if (mcqAnswers.length > 0) {
+        console.log('📤 [SUBMIT EXAM] Submitting MCQ answers...');
         setSubmissionStatus("Submitting MCQ answers...");
         const mcqRes = await submitMcqAnswers(generatedExam.examId, studentId, mcqAnswers);
+        console.log('✅ [SUBMIT EXAM] MCQ submitted! Score:', mcqRes.score, '/', mcqRes.totalMarks);
         setMcqResult(mcqRes);
         setScore(mcqRes.score);
       }
       
       // Step 3: Upload written answers if any - now async, navigates to evaluating screen
       if (writtenImageUris.length > 0) {
+        console.log('📤 [SUBMIT EXAM] Uploading written answers...');
         setSubmissionStatus("Uploading written answers for AI evaluation...");
         const uploadResult = await uploadWrittenAnswers(generatedExam.examId, studentId, writtenImageUris);
+        
+        console.log('✅ [SUBMIT EXAM] Written answers uploaded!');
+        console.log('📤 [SUBMIT EXAM] Submission ID:', uploadResult.writtenSubmissionId);
         
         // Save submission ID and redirect to evaluating screen for polling
         setWrittenSubmissionId(uploadResult.writtenSubmissionId);
         setSubmissionStatus(uploadResult.message || "✅ Answer sheet uploaded successfully!");
         setScreenState("evaluating");
+        console.log('📤 [SUBMIT EXAM] Navigated to evaluating screen, starting polling...');
         
         // Start polling for status
         try {
           const finalStatus = await pollSubmissionStatus(
             uploadResult.writtenSubmissionId,
             (status) => {
+              console.log('🔄 [POLLING] Status update:', status.status, '-', status.statusMessage);
               setEvaluationStatus(status);
               setSubmissionStatus(status.statusMessage);
             }
           );
           
+          console.log('✅ [POLLING] Evaluation complete! isComplete:', finalStatus.isComplete);
           if (finalStatus.isComplete && finalStatus.result) {
+            console.log('✅ [POLLING] Result received! Score:', finalStatus.result.grandScore);
             setExamResult(finalStatus.result);
             setScore(finalStatus.result.grandScore || 0);
             setEvaluationStatus(finalStatus);
           }
-        } catch (pollError) {
+        } catch (pollError: any) {
+          console.log('⚠️ [POLLING] Polling error:', pollError?.message || pollError);
           // Polling failed silently, status will be checked on next refresh
         }
         return; // Exit here, results will be shown from evaluating screen
@@ -1671,18 +1713,56 @@ export default function PUCExamScreen() {
 
   // Evaluating Screen - Waiting for AI evaluation
   if (screenState === "evaluating") {
-    const isComplete = evaluationStatus?.isComplete || false;
+    const isComplete = evaluationStatus?.isComplete || 
+      (evaluationStatus?.status && isEvaluationComplete(evaluationStatus.status));
     
     const handleCheckStatus = async () => {
       if (!writtenSubmissionId) return;
       
+      console.log('🔍 [CHECK STATUS] Checking status for submission:', writtenSubmissionId);
       try {
         setSubmissionStatus("Checking status...");
         const status = await checkSubmissionStatus(writtenSubmissionId);
+        console.log('🔍 [CHECK STATUS] Status response:', JSON.stringify(status));
+        console.log('🔍 [CHECK STATUS] Status code:', status.status, 'isComplete:', status.isComplete);
         setEvaluationStatus(status);
         setSubmissionStatus(status.statusMessage);
         
-        if (status.isComplete && status.result) {
+        // Check if evaluation is complete (status = "2" or "Completed")
+        if (status.isComplete || isEvaluationComplete(status.status)) {
+          console.log('✅ [CHECK STATUS] Evaluation complete! Fetching full results...');
+          try {
+            const fullResults = await getEvaluationResultsBySubmissionId(writtenSubmissionId);
+            console.log('✅ [CHECK STATUS] Full results received! Score:', fullResults.grandScore);
+            // Cast to ExamResult type for compatibility
+            setExamResult(fullResults as any);
+            setScore(fullResults.grandScore || 0);
+            
+            // Auto-redirect to results screen when evaluation is complete
+            console.log('✅ [CHECK STATUS] Redirecting to results screen...');
+            setShowDetailedResults(true);
+            setScreenState("results");
+          } catch (resultError: any) {
+            console.log('⚠️ [CHECK STATUS] Failed to fetch full results:', resultError?.message);
+            // Fallback to status.result if available
+            if (status.result) {
+              console.log('🔄 [CHECK STATUS] Using fallback result from status');
+              setExamResult(status.result);
+              setScore(status.result.grandScore || 0);
+              
+              // Auto-redirect to results screen when evaluation is complete
+              setShowDetailedResults(true);
+              setScreenState("results");
+            }
+          }
+        } else if (isEvaluationFailed(status.status)) {
+          // Status "3" = OCR Failed, "4" = Evaluation Failed
+          const failureMessage = status.status === "3" 
+            ? "OCR failed. Please upload clearer images."
+            : "Evaluation failed. Please contact support.";
+          setSubmissionStatus(failureMessage);
+        } else if (status.result) {
+          // For backward compatibility, use result from status if available
           setExamResult(status.result);
           setScore(status.result.grandScore || 0);
         }
@@ -1713,7 +1793,7 @@ export default function PUCExamScreen() {
             </Text>
 
             {/* Progress Info */}
-            {!isComplete && (
+            {!isComplete && !isEvaluationFailed(evaluationStatus?.status || "0") && (
               <View style={styles.evaluatingInfoCard}>
                 <Ionicons name="information-circle" size={24} color="#6366f1" />
                 <Text style={styles.evaluatingInfoText}>
@@ -1723,18 +1803,20 @@ export default function PUCExamScreen() {
               </View>
             )}
 
-            {/* Failed Status Message */}
-            {isComplete && evaluationStatus?.status === 'Failed' && (
+            {/* Failed Status Message - Status 3 (OCR Failed) or 4 (Evaluation Failed) */}
+            {evaluationStatus?.status && isEvaluationFailed(evaluationStatus.status) && (
               <View style={[styles.evaluatingInfoCard, { backgroundColor: '#FEE2E2' }]}>
                 <Ionicons name="alert-circle" size={24} color="#EF4444" />
                 <Text style={[styles.evaluatingInfoText, { color: '#DC2626' }]}>
-                  Evaluation failed. Please contact support or try again.
+                  {evaluationStatus.status === "3" 
+                    ? "OCR failed. Please upload clearer images of your answer sheet."
+                    : "Evaluation failed. Please contact support or try again."}
                 </Text>
               </View>
             )}
 
-            {/* Check Status Button - Show when not complete */}
-            {!isComplete && writtenSubmissionId && (
+            {/* Check Status Button - Show when not complete and not failed */}
+            {!isComplete && !isEvaluationFailed(evaluationStatus?.status || "0") && writtenSubmissionId && (
               <TouchableOpacity
                 style={styles.checkStatusButton}
                 onPress={handleCheckStatus}
@@ -1749,8 +1831,8 @@ export default function PUCExamScreen() {
               </TouchableOpacity>
             )}
 
-            {/* View Results Button - Only show when complete AND status is Completed */}
-            {isComplete && evaluationStatus?.status === 'Completed' && evaluationStatus?.result && (
+            {/* View Results Button - Only show when complete (status = "2" or "Completed") */}
+            {isComplete && (evaluationStatus?.result || examResult) && (
               <TouchableOpacity
                 style={styles.viewResultsButton}
                 onPress={() => {

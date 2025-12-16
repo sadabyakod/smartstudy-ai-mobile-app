@@ -10,6 +10,12 @@ export interface PendingEvaluation {
   submittedAt: Date;
 }
 
+// Evaluation result to pass when navigating to results screen
+export interface CompletedEvaluationResult {
+  writtenSubmissionId: string;
+  result: any; // The full evaluation result from API
+}
+
 export const NavigationContext = React.createContext<{
   currentScreen: Screen;
   navigate: (screen: Screen) => void;
@@ -17,6 +23,8 @@ export const NavigationContext = React.createContext<{
   canGoBack: boolean;
   pendingEvaluation: PendingEvaluation | null;
   setPendingEvaluation: (evaluation: PendingEvaluation | null) => void;
+  completedEvaluation: CompletedEvaluationResult | null;
+  setCompletedEvaluation: (evaluation: CompletedEvaluationResult | null) => void;
 }>({
   currentScreen: "home",
   navigate: () => {},
@@ -24,4 +32,6 @@ export const NavigationContext = React.createContext<{
   canGoBack: false,
   pendingEvaluation: null,
   setPendingEvaluation: () => {},
+  completedEvaluation: null,
+  setCompletedEvaluation: () => {},
 });

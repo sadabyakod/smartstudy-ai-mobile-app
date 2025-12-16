@@ -84,12 +84,24 @@ export interface WrittenSubmissionResult {
 }
 
 // Submission status polling types
+// Status codes from API: 0=Uploaded, 1=OCR Complete, 2=Evaluation Complete, 3=OCR Failed, 4=Evaluation Failed
 export type SubmissionStatus = 
-  | "PendingEvaluation" 
-  | "OcrProcessing" 
-  | "Evaluating" 
-  | "Completed" 
-  | "Failed";
+  | "0" | "1" | "2" | "3" | "4"  // Numeric status codes from API
+  | "PendingEvaluation"             // Legacy status
+  | "OcrProcessing"                 // Legacy status  
+  | "Evaluating"                    // Legacy status
+  | "Completed"                     // Legacy status (maps to "2")
+  | "Failed";                       // Legacy status (maps to "3" or "4")
+
+// Helper to check if evaluation is complete (status = 2 or "Completed")
+export function isEvaluationComplete(status: SubmissionStatus): boolean {
+  return status === "2" || status === "Completed";
+}
+
+// Helper to check if evaluation failed (status = 3, 4, or "Failed")
+export function isEvaluationFailed(status: SubmissionStatus): boolean {
+  return status === "3" || status === "4" || status === "Failed";
+}
 
 export interface SubmissionStatusResponse {
   writtenSubmissionId: string;
@@ -454,41 +466,76 @@ export async function uploadWrittenAnswers(
   imageUris: string[]
 ): Promise<WrittenSubmissionResult> {
   try {
+    console.log('📤 [UPLOAD] Starting upload...');
+    console.log('📤 [UPLOAD] ExamId:', examId);
+    console.log('📤 [UPLOAD] StudentId:', studentId);
+    console.log('📤 [UPLOAD] Image count:', imageUris.length);
+    
     const formData = new FormData();
     formData.append("examId", examId);
     formData.append("studentId", studentId);
     
     for (let i = 0; i < imageUris.length; i++) {
       const uri = imageUris[i];
+      console.log('📤 [UPLOAD] Processing image', i + 1, ':', uri.substring(0, 50) + '...');
       
-      if (uri.startsWith('blob:') || uri.startsWith('data:')) {
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        const filename = `written_answer_${i}.jpg`;
-        formData.append("files", blob, filename);
-      } else {
-        const filename = uri.split('/').pop() || `written_answer_${i}.jpg`;
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-        
-        formData.append("files", {
-          uri: uri,
-          name: filename,
-          type: type,
-        } as any);
-      }
+      // Get filename from URI
+      const uriParts = uri.split('/');
+      const originalFilename = uriParts[uriParts.length - 1] || `answer_sheet_${i + 1}.jpg`;
+      
+      // Determine file extension and MIME type
+      const extensionMatch = originalFilename.match(/\.(\w+)$/);
+      const extension = extensionMatch ? extensionMatch[1].toLowerCase() : 'jpg';
+      
+      // Map extension to proper MIME type
+      const mimeTypes: Record<string, string> = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'webp': 'image/webp',
+        'pdf': 'application/pdf',
+      };
+      const mimeType = mimeTypes[extension] || 'image/jpeg';
+      
+      // Create proper filename with extension
+      const filename = originalFilename.includes('.') 
+        ? originalFilename 
+        : `answer_sheet_${i + 1}.${extension}`;
+      
+      console.log('📤 [UPLOAD] File:', filename, 'Type:', mimeType);
+      
+      // For React Native, append file object directly
+      // The key must be "files" to match the API expectation
+      formData.append("files", {
+        uri: uri,
+        name: filename,
+        type: mimeType,
+      } as any);
     }
+    
+    console.log('📤 [UPLOAD] Sending request to:', `${API_BASE_URL}/api/exam/upload-written`);
     
     const response = await pucFetchWithTimeout(
       `${API_BASE_URL}/api/exam/upload-written`,
       {
         method: "POST",
         body: formData,
+        // Don't set Content-Type header - let fetch set it with boundary for multipart/form-data
       },
-      15000 // API now returns immediately (<1 second), reduced from 60s
+      60000 // 60 seconds timeout for file uploads
     );
 
+    console.log('📤 [UPLOAD] Response status:', response.status);
+
     if (!response.ok) {
+      // Try to get error details
+      let errorDetails = '';
+      try {
+        const errorBody = await response.text();
+        console.log('📤 [UPLOAD] Error response:', errorBody);
+        errorDetails = errorBody;
+      } catch {}
+      
       // Handle specific error codes
       if (response.status === 409) {
         throw new ApiError(
@@ -501,9 +548,9 @@ export async function uploadWrittenAnswers(
       if (response.status === 400) {
         let errorMessage = 'Invalid file. Please check file type (jpg, jpeg, png, webp, pdf) and size (max 10MB per file, max 20 files).';
         try {
-          const errorBody = await response.json();
-          if (errorBody?.message) {
-            errorMessage = errorBody.message;
+          const errorJson = JSON.parse(errorDetails);
+          if (errorJson?.message || errorJson?.error) {
+            errorMessage = errorJson.message || errorJson.error;
           }
         } catch {}
         throw new ApiError(errorMessage, 400);
@@ -511,13 +558,15 @@ export async function uploadWrittenAnswers(
       if (response.status === 404) {
         throw new ApiError('Exam not found. Please generate a new exam and try again.', 404);
       }
-      throw new ApiError(ERROR_MESSAGES.SERVER_ERROR, response.status);
+      throw new ApiError(`Upload failed: ${errorDetails || ERROR_MESSAGES.SERVER_ERROR}`, response.status);
     }
 
     const result = await response.json();
+    console.log('✅ [UPLOAD] Success! Submission ID:', result.writtenSubmissionId);
     
     return result;
   } catch (error: any) {
+    console.log('❌ [UPLOAD] Error:', error?.message || error);
     if (error instanceof ApiError) {
       throw error;
     }
