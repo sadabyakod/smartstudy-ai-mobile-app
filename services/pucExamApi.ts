@@ -288,7 +288,17 @@ export async function generatePUCExam(
       throw new ApiError(ERROR_MESSAGES.SERVER_ERROR, response.status);
     }
 
-    return await response.json();
+    const examData = await response.json();
+    console.log('🎯 [API RESPONSE] ExamId from API:', examData?.examId);
+    console.log('🎯 [API RESPONSE] Full exam response:', JSON.stringify({
+      examId: examData?.examId,
+      subject: examData?.subject,
+      grade: examData?.grade,
+      totalMarks: examData?.totalMarks,
+      duration: examData?.duration,
+      partsCount: examData?.parts?.length,
+    }));
+    return examData;
   } catch (error: any) {
     if (error instanceof ApiError) {
       throw error;

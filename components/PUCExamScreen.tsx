@@ -52,6 +52,11 @@ type AnswerMode = "type" | "upload";
 function McqResultItem({ mcqRes, styles }: { mcqRes: any; styles: any }) {
   const [expanded, setExpanded] = useState(false);
   
+  // Handle both API field names: studentAnswer/selectedOption, marks/marksAwarded
+  const studentAnswer = mcqRes.studentAnswer || mcqRes.selectedOption || '';
+  const marks = mcqRes.marks ?? mcqRes.marksAwarded ?? (mcqRes.isCorrect ? 1 : 0);
+  const maxMarks = mcqRes.maxMarks ?? 1;
+  
   return (
     <View style={styles.mcqResultCard}>
       <TouchableOpacity
@@ -67,9 +72,9 @@ function McqResultItem({ mcqRes, styles }: { mcqRes: any; styles: any }) {
               {mcqRes.isCorrect ? '✓' : '✗'}
             </Text>
           </View>
-          <Text style={styles.mcqQNum}>Q{mcqRes.questionNumber}</Text>
+          <Text style={styles.mcqQNum}>Q{mcqRes.questionNumber || mcqRes.questionId}</Text>
           <Text style={styles.mcqMarksText}>
-            {mcqRes.marks} mark{mcqRes.marks > 1 ? 's' : ''}
+            {marks}/{maxMarks} mark{maxMarks > 1 ? 's' : ''}
           </Text>
         </View>
         <Text style={styles.expandIcon}>{expanded ? '▼' : '▶'}</Text>
@@ -77,43 +82,46 @@ function McqResultItem({ mcqRes, styles }: { mcqRes: any; styles: any }) {
       
       {expanded && (
         <View style={styles.mcqResultDetails}>
-          <Text style={styles.mcqQuestionText}>{mcqRes.questionText}</Text>
+          {mcqRes.questionText && (
+            <Text style={styles.mcqQuestionText}>{mcqRes.questionText}</Text>
+          )}
           
-          <View style={styles.mcqOptionsContainer}>
-            {mcqRes.options && mcqRes.options.map((option: string, optIdx: number) => {
-              const isCorrect = option === mcqRes.correctAnswer;
-              const isStudentAnswer = option === mcqRes.studentAnswer;
-              
-              return (
-                <View key={optIdx} style={[
-                  styles.mcqOption,
-                  isCorrect && styles.mcqOptionCorrect,
-                  isStudentAnswer && !isCorrect && styles.mcqOptionWrong
-                ]}>
-                  <Text style={[
-                    styles.mcqOptionText,
-                    isCorrect && styles.mcqOptionTextCorrect,
-                    isStudentAnswer && !isCorrect && styles.mcqOptionTextWrong
+          {mcqRes.options && mcqRes.options.length > 0 && (
+            <View style={styles.mcqOptionsContainer}>
+              {mcqRes.options.map((option: string, optIdx: number) => {
+                const isCorrect = option === mcqRes.correctAnswer;
+                const isStudentAnswer = option === studentAnswer;
+                
+                return (
+                  <View key={optIdx} style={[
+                    styles.mcqOption,
+                    isCorrect && styles.mcqOptionCorrect,
+                    isStudentAnswer && !isCorrect && styles.mcqOptionWrong
                   ]}>
-                    {String.fromCharCode(65 + optIdx)}. {option}
-                    {isCorrect && ' ✓ Correct'}
-                    {isStudentAnswer && !isCorrect && ' ← Your answer'}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-          
-          {!mcqRes.isCorrect && (
-            <View style={styles.mcqAnswerSummary}>
-              <Text style={styles.mcqCorrectLabel}>
-                Correct Answer: <Text style={styles.mcqCorrectValue}>{mcqRes.correctAnswer}</Text>
-              </Text>
-              <Text style={styles.mcqYourLabel}>
-                Your Answer: <Text style={styles.mcqYourValue}>{mcqRes.studentAnswer}</Text>
-              </Text>
+                    <Text style={[
+                      styles.mcqOptionText,
+                      isCorrect && styles.mcqOptionTextCorrect,
+                      isStudentAnswer && !isCorrect && styles.mcqOptionTextWrong
+                    ]}>
+                      {String.fromCharCode(65 + optIdx)}. {option}
+                      {isCorrect && ' ✓ Correct'}
+                      {isStudentAnswer && !isCorrect && ' ← Your answer'}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           )}
+          
+          {/* Always show answer summary */}
+          <View style={styles.mcqAnswerSummary}>
+            <Text style={styles.mcqCorrectLabel}>
+              ✅ Correct: <Text style={styles.mcqCorrectValue}>{mcqRes.correctAnswer}</Text>
+            </Text>
+            <Text style={styles.mcqYourLabel}>
+              📝 Your Answer: <Text style={[styles.mcqYourValue, { color: mcqRes.isCorrect ? '#22C55E' : '#EF4444' }]}>{studentAnswer || 'Not answered'}</Text>
+            </Text>
+          </View>
         </View>
       )}
     </View>
@@ -151,9 +159,15 @@ export default function PUCExamScreen() {
   // Check for completed evaluation from navigation (e.g., from LearningHub)
   React.useEffect(() => {
     if (completedEvaluation?.result) {
+      console.log('📊 [PUCExamScreen] Received completedEvaluation from LearningHub!');
+      console.log('📊 [PUCExamScreen] Result keys:', Object.keys(completedEvaluation.result));
+      console.log('📊 [PUCExamScreen] grandScore:', completedEvaluation.result.grandScore);
+      console.log('📊 [PUCExamScreen] GrandScore (capital):', (completedEvaluation.result as any).GrandScore);
+      console.log('📊 [PUCExamScreen] percentage:', completedEvaluation.result.percentage);
+      console.log('📊 [PUCExamScreen] Percentage (capital):', (completedEvaluation.result as any).Percentage);
       // Set the exam result from completed evaluation
       setExamResult(completedEvaluation.result as any);
-      setScore(completedEvaluation.result.grandScore || 0);
+      setScore(completedEvaluation.result.grandScore || (completedEvaluation.result as any).GrandScore || 0);
       setWrittenSubmissionId(completedEvaluation.writtenSubmissionId);
       setShowDetailedResults(true);
       setScreenState("results");
@@ -1902,13 +1916,73 @@ export default function PUCExamScreen() {
     );
   }
 
-  // Results Screen
-  if (screenState === "results" && generatedExam) {
+  // Results Screen - show if we have examResult (from LearningHub) or generatedExam (from completing exam)
+  if (screenState === "results" && (examResult || generatedExam)) {
+    console.log('📊 [RESULTS SCREEN] Showing results');
+    console.log('📊 [RESULTS DATA] examResult:', JSON.stringify(examResult, null, 2));
+    console.log('📊 [RESULTS DATA] mcqResult:', JSON.stringify(mcqResult, null, 2));
+    console.log('📊 [RESULTS DATA] generatedExam:', JSON.stringify(generatedExam, null, 2));
+    console.log('📊 [RESULTS DATA] userAnswers:', JSON.stringify(userAnswers, null, 2));
+    console.log('📊 [RESULTS DATA] uploadedImages count:', Object.keys(uploadedImages).length);
+    
+    // Check if we have any actual result data
+    const hasResultData = examResult && (
+      (examResult.mcqResults && examResult.mcqResults.length > 0) ||
+      (examResult.subjectiveResults && examResult.subjectiveResults.length > 0) ||
+      examResult.grandScore > 0
+    );
+    
+    // If no result data and no generated exam, show error state
+    if (!hasResultData && !generatedExam) {
+      return (
+        <SafeAreaView style={styles.container}>
+          <LinearGradient colors={["#E0EAFC", "#CFDEF3"]} style={styles.gradient}>
+            <TouchableOpacity 
+              style={styles.myChatButton} 
+              onPress={() => navigate("chat")}
+            >
+              <Ionicons name="chatbubbles" size={20} color="#4F46E5" />
+              <Text style={styles.myChatButtonText}>My Chat</Text>
+            </TouchableOpacity>
+
+            <ScrollView contentContainerStyle={styles.resultsContainer}>
+              <View style={[styles.resultIcon, { backgroundColor: '#F97316' }]}>
+                <Ionicons name="hourglass" size={60} color="#fff" />
+              </View>
+
+              <Text style={styles.resultStatus}>Evaluation In Progress</Text>
+
+              <View style={styles.scoreCard}>
+                <Text style={styles.scoreTitle}>⏳ Please Wait</Text>
+                <Text style={{ fontSize: 16, color: '#6B7280', textAlign: 'center', marginTop: 12 }}>
+                  Your answers are being evaluated. This usually takes 5-6 minutes.
+                </Text>
+                <Text style={{ fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 8 }}>
+                  Please check back from the Learning Hub by tapping "Check Results" again.
+                </Text>
+              </View>
+
+              <TouchableOpacity style={styles.actionButton} onPress={() => navigate("learningHub")}>
+                <LinearGradient
+                  colors={["#4F46E5", "#7C3AED"]}
+                  style={styles.buttonGradient}
+                >
+                  <Ionicons name="home" size={24} color="#fff" />
+                  <Text style={styles.buttonText}>Back to Learning Hub</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </ScrollView>
+          </LinearGradient>
+        </SafeAreaView>
+      );
+    }
+    
     // Build MCQ results from exam data and userAnswers if not provided by backend
     let mcqResultsArray: any[] = [];
     const hasBackendMcqResults = examResult?.mcqResults && examResult.mcqResults.length > 0;
     
-    if (!hasBackendMcqResults && userAnswers && Object.keys(userAnswers).length > 0) {
+    // Only build MCQ results if we have generatedExam (i.e., completed an exam in this session)
+    if (!hasBackendMcqResults && generatedExam && userAnswers && Object.keys(userAnswers).length > 0) {
       let questionNumber = 1;
       for (const part of generatedExam.parts) {
         for (const question of part.questions) {
@@ -1942,8 +2016,8 @@ export default function PUCExamScreen() {
     
     // Use API result if available, otherwise calculate locally
     const totalScore = examResult ? examResult.grandScore : (mcqResult ? mcqResult.score : score);
-    const totalMaxScore = examResult ? examResult.grandTotalMarks : generatedExam.totalMarks;
-    const percentage = examResult ? Math.round(examResult.percentage) : (mcqResult ? Math.round(mcqResult.percentage) : Math.round((score / generatedExam.totalMarks) * 100));
+    const totalMaxScore = examResult ? examResult.grandTotalMarks : (generatedExam?.totalMarks || 100);
+    const percentage = examResult ? Math.round(examResult.percentage) : (mcqResult ? Math.round(mcqResult.percentage) : Math.round((score / (generatedExam?.totalMarks || 100)) * 100));
     const isPassed = examResult ? examResult.passed : percentage >= 35; // Karnataka passing percentage
     const grade = examResult ? examResult.grade : (mcqResult ? (
       mcqResult.percentage >= 90 ? "A+" :
@@ -1977,7 +2051,27 @@ export default function PUCExamScreen() {
             <Text style={styles.myChatButtonText}>My Chat</Text>
           </TouchableOpacity>
 
-          <ScrollView contentContainerStyle={styles.resultsContainer}>
+          <ScrollView 
+            contentContainerStyle={styles.resultsContainer}
+            showsVerticalScrollIndicator={true}
+          >
+            {/* Debug Info - Remove after testing */}
+            <View style={{ backgroundColor: '#FFF', padding: 12, margin: 16, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <Text style={{ fontWeight: 'bold', marginBottom: 8 }}>Debug Info:</Text>
+              <Text>Has examResult: {examResult ? 'Yes' : 'No'}</Text>
+              <Text>Has mcqResult: {mcqResult ? 'Yes' : 'No'}</Text>
+              <Text>Has generatedExam: {generatedExam ? 'Yes' : 'No'}</Text>
+              <Text>User answers count: {Object.keys(userAnswers).length}</Text>
+              <Text>Uploaded images: {Object.keys(uploadedImages).length}</Text>
+              {examResult && (
+                <>
+                  <Text>Grand Score: {examResult.grandScore}</Text>
+                  <Text>MCQ Results: {examResult.mcqResults?.length || 0}</Text>
+                  <Text>Subjective Results: {examResult.subjectiveResults?.length || 0}</Text>
+                </>
+              )}
+            </View>
+            
             {/* Result Icon */}
             <View style={[styles.resultIcon, { backgroundColor: gradeColor }]}>
               <Ionicons
@@ -2000,34 +2094,73 @@ export default function PUCExamScreen() {
                 <Text style={styles.gradeText}>Grade: {grade}</Text>
               </View>
             </View>
+            
+            {/* Scroll Indicator */}
+            <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+              <Ionicons name="chevron-down" size={24} color="#4F46E5" />
+              <Text style={{ color: '#4F46E5', fontSize: 12, fontWeight: '600' }}>Scroll for detailed results</Text>
+            </View>
 
             {/* Exam Details */}
             <View style={styles.resultDetailsCard}>
-              <Text style={styles.detailsTitle}>Exam Details</Text>
+              <Text style={styles.detailsTitle}>📋 Exam Summary</Text>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Subject:</Text>
-                <Text style={styles.detailValue}>{generatedExam.subject}</Text>
+                <Text style={styles.detailValue}>{generatedExam?.subject || examResult?.examTitle?.split('_').slice(2, -3).join(' ') || 'Mathematics'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Class:</Text>
-                <Text style={styles.detailValue}>{generatedExam.grade}</Text>
+                <Text style={styles.detailValue}>{generatedExam?.grade || '2nd PUC'}</Text>
               </View>
               
               {/* Show separate scores when using new API */}
               {examResult && (
                 <>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>MCQ Score:</Text>
-                    <Text style={[styles.detailValue, { color: '#4F46E5' }]}>
-                      {examResult.mcqScore}/{examResult.mcqTotalMarks}
-                    </Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Subjective Score:</Text>
-                    <Text style={[styles.detailValue, { color: '#7C3AED' }]}>
-                      {examResult.subjectiveScore}/{examResult.subjectiveTotalMarks}
-                    </Text>
-                  </View>
+                  {/* MCQ Section */}
+                  {(examResult.mcqTotalMarks > 0 || (examResult.mcqResults && examResult.mcqResults.length > 0)) && (
+                    <>
+                      <View style={[styles.detailRow, { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB' }]}>
+                        <Text style={[styles.detailLabel, { fontWeight: '700', color: '#4F46E5' }]}>📊 MCQ Section</Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Score:</Text>
+                        <Text style={[styles.detailValue, { color: '#4F46E5', fontWeight: '700' }]}>
+                          {examResult.mcqScore}/{examResult.mcqTotalMarks}
+                        </Text>
+                      </View>
+                      {examResult.mcqResults && examResult.mcqResults.length > 0 && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Correct Answers:</Text>
+                          <Text style={[styles.detailValue, { color: '#22C55E' }]}>
+                            {examResult.mcqResults.filter((r: any) => r.isCorrect).length}/{examResult.mcqResults.length}
+                          </Text>
+                        </View>
+                      )}
+                    </>
+                  )}
+                  
+                  {/* Subjective Section */}
+                  {(examResult.subjectiveTotalMarks > 0 || (examResult.subjectiveResults && examResult.subjectiveResults.length > 0)) && (
+                    <>
+                      <View style={[styles.detailRow, { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB' }]}>
+                        <Text style={[styles.detailLabel, { fontWeight: '700', color: '#7C3AED' }]}>📝 Subjective Section</Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Score:</Text>
+                        <Text style={[styles.detailValue, { color: '#7C3AED', fontWeight: '700' }]}>
+                          {examResult.subjectiveScore}/{examResult.subjectiveTotalMarks}
+                        </Text>
+                      </View>
+                      {examResult.subjectiveResults && examResult.subjectiveResults.length > 0 && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Questions Evaluated:</Text>
+                          <Text style={[styles.detailValue, { color: '#7C3AED' }]}>
+                            {examResult.subjectiveResults.length}
+                          </Text>
+                        </View>
+                      )}
+                    </>
+                  )}
                 </>
               )}
               
@@ -2075,36 +2208,45 @@ export default function PUCExamScreen() {
             {/* Subjective Feedback (if API result available) */}
             {examResult && examResult.subjectiveResults && examResult.subjectiveResults.length > 0 && (
               <View style={styles.feedbackCard}>
-                <Text style={styles.feedbackTitle}>📝 AI Subjective Evaluation</Text>
+                <Text style={styles.feedbackTitle}>📝 Subjective Evaluation</Text>
                 <Text style={styles.feedbackSubtitle}>
-                  Tap each question to see detailed feedback
+                  Detailed AI evaluation of your handwritten answers
                 </Text>
-                {examResult.subjectiveResults.map((result, index) => {
-                  const scoreEarned = result.earnedMarks ?? result.score ?? 0;
-                  const maxMarks = result.maxMarks ?? 0;
+                {examResult.subjectiveResults.map((result: any, index: number) => {
+                  const scoreEarned = result.earnedMarks ?? result.awardedScore ?? 0;
+                  const maxMarks = result.maxMarks ?? result.maxScore ?? 0;
                   const scorePercent = maxMarks > 0 ? (scoreEarned / maxMarks) * 100 : 0;
                   const scoreColor = scorePercent >= 80 ? '#22C55E' : scorePercent >= 60 ? '#F97316' : '#EF4444';
-                  // Use API's isFullyCorrect field or fallback to percentage check
-                  const isIncomplete = (result.isFullyCorrect === false) || (scorePercent < 100 && result.expectedAnswer);
+                  const isFullMarks = scorePercent >= 100;
+                  const studentAnswer = result.studentAnswerEcho || result.studentAnswer || '';
+                  const modelAnswer = result.expectedAnswer || result.modelAnswer || '';
+                  const feedback = result.overallFeedback || result.feedback || '';
                   
                   return (
                     <View key={result.questionId || index} style={styles.subjectiveResultCard}>
-                      {/* Question Header */}
+                      {/* Question Header with Score */}
                       <View style={styles.subjectiveHeader}>
                         <View style={styles.questionBadge}>
                           <Text style={styles.questionBadgeText}>Q{result.questionNumber || index + 1}</Text>
                         </View>
                         <View style={[styles.scoreBadge, { backgroundColor: scoreColor }]}>
-                          <Text style={styles.scoreBadgeText}>{scoreEarned}/{maxMarks}</Text>
+                          <Text style={styles.scoreBadgeText}>{scoreEarned}/{maxMarks} marks</Text>
                         </View>
                       </View>
 
-                      {/* Incomplete Answer Indicator */}
-                      {isIncomplete && (
+                      {/* Full marks celebration or needs improvement indicator */}
+                      {isFullMarks ? (
+                        <View style={[styles.incompleteAnswerBanner, { backgroundColor: '#DCFCE7' }]}>
+                          <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
+                          <Text style={[styles.incompleteAnswerText, { color: '#166534' }]}>
+                            Perfect! Full marks awarded 🎉
+                          </Text>
+                        </View>
+                      ) : scorePercent < 50 && (
                         <View style={styles.incompleteAnswerBanner}>
-                          <Ionicons name="warning" size={16} color="#D97706" />
+                          <Ionicons name="alert-circle" size={16} color="#D97706" />
                           <Text style={styles.incompleteAnswerText}>
-                            Incomplete - See expected answer below
+                            Needs improvement - Review model answer below
                           </Text>
                         </View>
                       )}
@@ -2112,31 +2254,31 @@ export default function PUCExamScreen() {
                       {/* Question Text */}
                       {result.questionText && (
                         <View style={styles.questionSection}>
-                          <Text style={styles.sectionLabel}>Question:</Text>
+                          <Text style={styles.sectionLabel}>📌 Question:</Text>
                           <Text style={styles.questionTextSmall}>{result.questionText}</Text>
                         </View>
                       )}
                       
-                      {/* AI Feedback */}
-                      <View style={styles.feedbackSection}>
-                        <Text style={styles.sectionLabel}>🤖 AI Feedback:</Text>
-                        <Text style={styles.aiFeedbackText}>
-                          {result.overallFeedback || result.feedback || "Evaluation completed."}
-                        </Text>
-                      </View>
-                      
-                      {/* Student's Answer (extracted from image) */}
-                      {(result.studentAnswer || result.studentAnswerEcho) && (
+                      {/* Student's Answer (extracted from image via OCR) */}
+                      {studentAnswer && (
                         <View style={styles.studentAnswerSection}>
-                          <Text style={styles.sectionLabel}>📝 Your Answer:</Text>
-                          <Text style={styles.studentAnswerText}>{result.studentAnswer || result.studentAnswerEcho}</Text>
+                          <Text style={styles.sectionLabel}>✏️ Your Answer (from image):</Text>
+                          <Text style={styles.studentAnswerText}>{studentAnswer}</Text>
+                        </View>
+                      )}
+                      
+                      {/* AI Feedback */}
+                      {feedback && (
+                        <View style={styles.feedbackSection}>
+                          <Text style={styles.sectionLabel}>🤖 AI Feedback:</Text>
+                          <Text style={styles.aiFeedbackText}>{feedback}</Text>
                         </View>
                       )}
 
-                      {/* Step Analysis if available - PRIORITIZED for step-wise marks */}
+                      {/* Step-by-Step Rubric Breakdown */}
                       {result.stepAnalysis && result.stepAnalysis.length > 0 && (
                         <View style={styles.stepAnalysisSection}>
-                          <Text style={styles.sectionLabel}>📊 Step-by-Step Marking:</Text>
+                          <Text style={styles.sectionLabel}>📊 Marking Breakdown:</Text>
                           {result.stepAnalysis.map((step: any, stepIndex: number) => {
                             // Handle both API field names: marks/marksAwarded and maxMarks/maxMarksForStep
                             const stepMarks = step.marksAwarded ?? step.marks ?? 0;
@@ -2173,14 +2315,14 @@ export default function PUCExamScreen() {
                         </View>
                       )}
                       
-                      {/* Expected Answer - Show prominently if incomplete */}
-                      {result.expectedAnswer && (
+                      {/* Model/Expected Answer - Show prominently if not full marks */}
+                      {modelAnswer && !isFullMarks && (
                         <View style={[
                           styles.expectedAnswerSection,
-                          isIncomplete && styles.expectedAnswerHighlighted
+                          scorePercent < 50 && styles.expectedAnswerHighlighted
                         ]}>
-                          <Text style={styles.sectionLabel}>✅ Expected Answer:</Text>
-                          <Text style={styles.expectedAnswerText}>{result.expectedAnswer}</Text>
+                          <Text style={styles.sectionLabel}>✅ Model Answer:</Text>
+                          <Text style={styles.expectedAnswerText}>{modelAnswer}</Text>
                         </View>
                       )}
                       

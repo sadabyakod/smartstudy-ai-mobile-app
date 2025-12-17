@@ -1,6 +1,6 @@
 export const API_BASE_URL = "https://smartstudy-api-athtbtapcvdjesbe.centralindia-01.azurewebsites.net";
-// Local URL: http://192.168.1.77:8080
-// Azure URL: https://smartstudy-api-athtbtapcvdjesbe.centralindia-01.azurewebsites.net
+// Production Azure URL: https://smartstudy-api-athtbtapcvdjesbe.centralindia-01.azurewebsites.net
+// Local URL: http://10.244.195.109:8080
 
 // User-friendly error messages
 export const ERROR_MESSAGES = {

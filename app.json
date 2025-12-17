@@ -12,17 +12,6 @@
     },
     "ios": {
       "bundleIdentifier": "com.sadashivbyakod.smartstudyaichatbot"
-    },
-    "updates": {
-      "enabled": false,
-      "checkAutomatically": "ON_ERROR_RECOVERY",
-      "fallbackToCacheTimeout": 0,
-      "url": ""
-    },
-    "extra": {
-      "eas": {
-        "projectId": "1659b73b-2dc5-4061-9c55-1549ab598e0f"
-      }
     }
   }
 }

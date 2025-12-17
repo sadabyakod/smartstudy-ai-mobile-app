@@ -159,20 +159,15 @@ export default function LearningHub() {
       if (status.isComplete || isEvaluationComplete(status.status)) {
         console.log('✅ [LearningHub] Evaluation complete! Fetching full results...');
         // Fetch full results using new endpoint and auto-redirect to results
-        try {
-          const fullResults = await getEvaluationResultsBySubmissionId(pendingEvaluation.writtenSubmissionId);
-          console.log('✅ [LearningHub] Full results received! Navigating to results...');
-          // Set completed evaluation data and navigate to results screen
-          setCompletedEvaluation({
-            writtenSubmissionId: pendingEvaluation.writtenSubmissionId,
-            result: fullResults
-          });
-          setPendingEvaluation(null);
-          setEvaluationStatus(null);
-          navigate("puc-exam");
-        } catch (resultError: any) {
-          console.log('⚠️ [LearningHub] Failed to fetch full results:', resultError?.message);
-          // Fallback - still navigate to PUC exam to show results
+        // Retry up to 10 times with 5 second delay (50 seconds total)
+        // Backend may take time to write results to blob storage after marking complete
+        const fullResults = await getEvaluationResultsBySubmissionId(pendingEvaluation.writtenSubmissionId, 10, 5000);
+        
+        // Check if results are still pending (grandScore = -1 is special marker)
+        console.log('📊 [LearningHub] Checking results - grandScore:', fullResults.grandScore, '_isPending:', (fullResults as any)._isPending);
+        if ((fullResults as any)._isPending || fullResults.grandScore === -1) {
+          console.log('📊 [LearningHub] Results still being prepared...');
+          // Check if we have result in status response as fallback
           if (status.result) {
             console.log('🔄 [LearningHub] Using fallback result from status');
             setCompletedEvaluation({
@@ -182,7 +177,24 @@ export default function LearningHub() {
             setPendingEvaluation(null);
             setEvaluationStatus(null);
             navigate("puc-exam");
+          } else {
+            // Results not ready yet - show friendly message
+            Alert.alert(
+              "🎉 Great News!",
+              "Your answers have been checked! We're preparing your detailed feedback - this usually takes just 5-6 minutes. Tap 'Check Results' again in a moment!",
+              [{ text: "Got it!" }]
+            );
           }
+        } else {
+          console.log('✅ [LearningHub] Full results received! Navigating to results...');
+          // Set completed evaluation data and navigate to results screen
+          setCompletedEvaluation({
+            writtenSubmissionId: pendingEvaluation.writtenSubmissionId,
+            result: fullResults
+          });
+          setPendingEvaluation(null);
+          setEvaluationStatus(null);
+          navigate("puc-exam");
         }
       } else if (isEvaluationFailed(status.status)) {
         console.log('❌ [LearningHub] Evaluation failed! Status:', status.status);
