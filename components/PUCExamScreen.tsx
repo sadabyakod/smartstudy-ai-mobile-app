@@ -2399,11 +2399,11 @@ export default function PUCExamScreen() {
                         </View>
                       )}
 
-                      {/* Step-by-Step Rubric Breakdown */}
+                      {/* Step-by-Step Rubric Breakdown - Limited to maxMarks steps */}
                       {result.stepAnalysis && result.stepAnalysis.length > 0 && (
                         <View style={styles.stepAnalysisSection}>
                           <Text style={styles.sectionLabel}>📊 Marking Breakdown:</Text>
-                          {result.stepAnalysis.map((step: any, stepIndex: number) => {
+                          {result.stepAnalysis.slice(0, maxMarks || result.stepAnalysis.length).map((step: any, stepIndex: number) => {
                             // Handle both API field names: marks/marksAwarded and maxMarks/maxMarksForStep
                             const stepMarks = step.marksAwarded ?? step.marks ?? 0;
                             const stepMaxMarks = step.maxMarksForStep ?? step.maxMarks;
