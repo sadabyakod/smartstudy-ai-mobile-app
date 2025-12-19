@@ -87,42 +87,24 @@ function McqResultItem({ mcqRes, styles }: { mcqRes: any; styles: any }) {
             <Text style={styles.mcqQuestionText}>{mcqRes.questionText}</Text>
           )}
           
-          {mcqRes.options && mcqRes.options.length > 0 && (
-            <View style={styles.mcqOptionsContainer}>
-              {mcqRes.options.map((option: string, optIdx: number) => {
-                const isCorrect = option === mcqRes.correctAnswer;
-                const isStudentAnswer = option === studentAnswer;
-                
-                return (
-                  <View key={optIdx} style={[
-                    styles.mcqOption,
-                    isCorrect && styles.mcqOptionCorrect,
-                    isStudentAnswer && !isCorrect && styles.mcqOptionWrong
-                  ]}>
-                    <Text style={[
-                      styles.mcqOptionText,
-                      isCorrect && styles.mcqOptionTextCorrect,
-                      isStudentAnswer && !isCorrect && styles.mcqOptionTextWrong
-                    ]}>
-                      {String.fromCharCode(65 + optIdx)}. {option}
-                      {isCorrect && ' ✓ Correct'}
-                      {isStudentAnswer && !isCorrect && ' ← Your answer'}
-                    </Text>
-                  </View>
-                );
-              })}
+          {/* Only show answer details when wrong */}
+          {!mcqRes.isCorrect && (
+            <View style={styles.mcqAnswerSummary}>
+              <Text style={styles.mcqYourLabel}>
+                📝 Your Answer: <Text style={[styles.mcqYourValue, { color: '#EF4444' }]}>{studentAnswer || 'Not answered'}</Text>
+              </Text>
+              <Text style={styles.mcqCorrectLabel}>
+                ✅ Correct Answer: <Text style={styles.mcqCorrectValue}>{mcqRes.correctAnswer}</Text>
+              </Text>
             </View>
           )}
-          
-          {/* Always show answer summary */}
-          <View style={styles.mcqAnswerSummary}>
-            <Text style={styles.mcqCorrectLabel}>
-              ✅ Correct: <Text style={styles.mcqCorrectValue}>{mcqRes.correctAnswer}</Text>
-            </Text>
-            <Text style={styles.mcqYourLabel}>
-              📝 Your Answer: <Text style={[styles.mcqYourValue, { color: mcqRes.isCorrect ? '#22C55E' : '#EF4444' }]}>{studentAnswer || 'Not answered'}</Text>
-            </Text>
-          </View>
+          {mcqRes.isCorrect && (
+            <View style={styles.mcqAnswerSummary}>
+              <Text style={[styles.mcqCorrectLabel, { color: '#22C55E' }]}>
+                ✓ Your answer is correct!
+              </Text>
+            </View>
+          )}
         </View>
       )}
     </View>

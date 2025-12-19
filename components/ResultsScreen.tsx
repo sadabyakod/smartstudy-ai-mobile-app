@@ -217,44 +217,24 @@ function McqQuestionResult({
             <Text style={styles.mcqQuestionText}>{result.questionText}</Text>
           </View>
 
-          {/* Options */}
-          <View style={styles.mcqDetailSection}>
-            <Text style={styles.mcqDetailLabel}>Options:</Text>
-            {result.options.map((option, idx) => {
-              const isCorrect = option === result.correctAnswer;
-              const isStudentAnswer = option === result.studentAnswer;
-              
-              return (
-                <View key={idx} style={[
-                  styles.mcqOption,
-                  isCorrect && styles.mcqOptionCorrect,
-                  isStudentAnswer && !isCorrect && styles.mcqOptionWrong
-                ]}>
-                  <Text style={[
-                    styles.mcqOptionText,
-                    isCorrect && styles.mcqOptionTextCorrect,
-                    isStudentAnswer && !isCorrect && styles.mcqOptionTextWrong
-                  ]}>
-                    {String.fromCharCode(65 + idx)}. {option}
-                    {isCorrect && ' ✓'}
-                    {isStudentAnswer && !isCorrect && ' (Your answer)'}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* Correct Answer */}
-          <View style={styles.mcqDetailSection}>
-            <Text style={styles.mcqCorrectAnswerLabel}>
-              Correct Answer: <Text style={styles.mcqCorrectAnswerText}>{result.correctAnswer}</Text>
-            </Text>
-            {result.studentAnswer && !result.isCorrect && (
+          {/* Answer Summary - Only show correct answer when wrong */}
+          {!result.isCorrect && result.studentAnswer && (
+            <View style={styles.mcqDetailSection}>
               <Text style={styles.mcqYourAnswerLabel}>
                 Your Answer: <Text style={styles.mcqYourAnswerText}>{result.studentAnswer}</Text>
               </Text>
-            )}
-          </View>
+              <Text style={styles.mcqCorrectAnswerLabel}>
+                Correct Answer: <Text style={styles.mcqCorrectAnswerText}>{result.correctAnswer}</Text>
+              </Text>
+            </View>
+          )}
+          {result.isCorrect && (
+            <View style={styles.mcqDetailSection}>
+              <Text style={styles.mcqCorrectAnswerLabel}>
+                ✓ Your answer is correct!
+              </Text>
+            </View>
+          )}
         </View>
       )}
     </View>
