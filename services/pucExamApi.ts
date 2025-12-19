@@ -595,10 +595,16 @@ export async function uploadWrittenAnswers(
     formData.append("examId", examId);
     formData.append("studentId", studentId);
     
-    // Add MCQ answers as JSON string if provided
+    // FIX: Convert mcqAnswers from Record<string, string> to array format expected by API
+    // API expects: [{"questionId": "A1", "selectedOption": "B"}, ...]
+    // Mobile sends: {"A1": "B", "A2": "C"}
     if (mcqAnswers && Object.keys(mcqAnswers).length > 0) {
-      formData.append("mcqAnswers", JSON.stringify(mcqAnswers));
-      console.log('📤 [UPLOAD] MCQ Answers JSON:', JSON.stringify(mcqAnswers));
+      const mcqAnswersArray = Object.entries(mcqAnswers).map(([questionId, selectedOption]) => ({
+        questionId,
+        selectedOption
+      }));
+      formData.append("mcqAnswers", JSON.stringify(mcqAnswersArray));
+      console.log('📤 [UPLOAD] MCQ Answers JSON:', JSON.stringify(mcqAnswersArray));
     }
     
     for (let i = 0; i < imageUris.length; i++) {
@@ -631,7 +637,6 @@ export async function uploadWrittenAnswers(
       console.log('📤 [UPLOAD] File:', filename, 'Type:', mimeType);
       
       // For React Native, append file object directly
-      // The key must be "files" to match the API expectation
       formData.append("files", {
         uri: uri,
         name: filename,
@@ -639,10 +644,12 @@ export async function uploadWrittenAnswers(
       } as any);
     }
     
-    console.log('📤 [UPLOAD] Sending request to:', `${API_BASE_URL}/api/exam-submission/upload-written`);
+    // FIX: Correct endpoint - /api/exam/upload-written (NOT /api/exam-submission/upload-written)
+    const uploadUrl = `${API_BASE_URL}/api/exam/upload-written`;
+    console.log('📤 [UPLOAD] Sending request to:', uploadUrl);
     
     const response = await pucFetchWithTimeout(
-      `${API_BASE_URL}/api/exam-submission/upload-written`,
+      uploadUrl,
       {
         method: "POST",
         body: formData,
@@ -714,7 +721,6 @@ export async function uploadWrittenAnswers(
       error.message?.includes('Network') || error.message?.includes('fetch'));
   }
 }
-
 /**
  * Get full exam results including MCQ and subjective scores
  */
