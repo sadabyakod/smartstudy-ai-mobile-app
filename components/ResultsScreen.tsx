@@ -34,11 +34,13 @@ export default function ResultsScreen({
     try {
       setLoading(true);
       setError(null);
+      
       const data = await getExamResults(examId, studentId);
       setResults(data);
     } catch (err: any) {
-      setError(err.userMessage || err.message || 'Failed to load results');
-      Alert.alert('Error', err.userMessage || err.message || 'Failed to load results');
+      const errorMsg = err.userMessage || err.message || 'Failed to load results';
+      setError(errorMsg);
+      Alert.alert('Error', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -89,17 +91,17 @@ export default function ResultsScreen({
           <Text style={styles.scoreTitle}>Your Score</Text>
           <View style={styles.scoreRow}>
             <Text style={styles.scoreValue}>
-              {results.mcqScore + results.subjectiveScore}
+              {(results.mcqScore || 0) + (results.subjectiveScore || 0)}
             </Text>
             <Text style={styles.scoreMax}>
-              / {results.mcqTotalMarks + results.subjectiveTotalMarks}
+              / {(results.mcqTotalMarks || 0) + (results.subjectiveTotalMarks || 0)}
             </Text>
           </View>
           <View style={styles.gradeContainer}>
-            <View style={[styles.gradeBadge, { backgroundColor: getGradeColor(results.grade) }]}>
-              <Text style={styles.gradeText}>{results.grade}</Text>
+            <View style={[styles.gradeBadge, { backgroundColor: getGradeColor(results.grade || 'F') }]}>
+              <Text style={styles.gradeText}>{results.grade || 'N/A'}</Text>
             </View>
-            <Text style={styles.percentageText}>{results.percentage.toFixed(1)}%</Text>
+            <Text style={styles.percentageText}>{(results.percentage || 0).toFixed(1)}%</Text>
           </View>
           <Text style={styles.passedText}>
             {results.passed ? '✓ Passed' : '✗ Not Passed'}
@@ -107,14 +109,14 @@ export default function ResultsScreen({
         </LinearGradient>
 
         {/* MCQ Section */}
-        {results.mcqTotalMarks > 0 && (
+        {(results.mcqTotalMarks || 0) > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>MCQ Performance</Text>
             <View style={styles.scoreBreakdown}>
               <View style={styles.scoreItem}>
                 <Text style={styles.scoreLabel}>Score</Text>
                 <Text style={styles.scoreNumber}>
-                  {results.mcqScore} / {results.mcqTotalMarks}
+                  {results.mcqScore || 0} / {results.mcqTotalMarks || 0}
                 </Text>
               </View>
             </View>
@@ -138,7 +140,7 @@ export default function ResultsScreen({
               <View style={styles.scoreItem}>
                 <Text style={styles.scoreLabel}>Total Score</Text>
                 <Text style={styles.scoreNumber}>
-                  {results.subjectiveScore} / {results.subjectiveTotalMarks}
+                  {results.subjectiveScore || 0} / {results.subjectiveTotalMarks || 0}
                 </Text>
               </View>
             </View>
@@ -156,19 +158,19 @@ export default function ResultsScreen({
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>MCQ Score:</Text>
             <Text style={styles.summaryValue}>
-              {results.mcqScore} / {results.mcqTotalMarks}
+              {results.mcqScore || 0} / {results.mcqTotalMarks || 0}
             </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Subjective Score:</Text>
             <Text style={styles.summaryValue}>
-              {results.subjectiveScore} / {results.subjectiveTotalMarks}
+              {results.subjectiveScore || 0} / {results.subjectiveTotalMarks || 0}
             </Text>
           </View>
           <View style={[styles.summaryRow, styles.summaryRowTotal]}>
             <Text style={styles.summaryLabelBold}>Grand Total:</Text>
             <Text style={styles.summaryValueBold}>
-              {results.grandScore} / {results.grandTotalMarks}
+              {results.grandScore || 0} / {results.grandTotalMarks || 0}
             </Text>
           </View>
         </View>
@@ -294,29 +296,29 @@ function SubjectiveQuestionResult({
         <View style={styles.questionDetails}>
           {/* Question Text */}
           <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>Question:</Text>
+            <Text style={styles.detailLabel}>📝 Question:</Text>
             <Text style={styles.detailText}>{result.questionText}</Text>
+          </View>
+
+          {/* Student's Answer */}
+          <View style={styles.detailSection}>
+            <Text style={styles.detailLabel}>✍️ Your Answer:</Text>
+            <Text style={styles.studentAnswerText}>
+              {result.studentAnswer || result.studentAnswerEcho || '[No answer provided]'}
+            </Text>
+          </View>
+
+          {/* Model Answer */}
+          <View style={styles.detailSection}>
+            <Text style={styles.detailLabel}>✅ Model Answer:</Text>
+            <Text style={styles.expectedAnswerText}>{result.expectedAnswer}</Text>
           </View>
 
           {/* AI Feedback */}
           <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>AI Feedback:</Text>
+            <Text style={styles.detailLabel}>🤖 AI Evaluation:</Text>
             <Text style={styles.feedbackText}>{result.feedback}</Text>
           </View>
-
-          {/* Expected Answer */}
-          <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>Expected Answer:</Text>
-            <Text style={styles.expectedAnswerText}>{result.expectedAnswer}</Text>
-          </View>
-
-          {/* Student's Answer */}
-          {result.studentAnswer && (
-            <View style={styles.detailSection}>
-              <Text style={styles.detailLabel}>Your Answer:</Text>
-              <Text style={styles.studentAnswerText}>{result.studentAnswer}</Text>
-            </View>
-          )}
 
           {/* Improvement Suggestions */}
           {result.improvementSuggestions && (

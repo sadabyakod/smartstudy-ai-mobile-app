@@ -111,7 +111,8 @@ function normalizeEvaluationResult(data: any): EvaluationResult {
   
   if (isMcqOnlyResponse) {
     // MCQ-only response format
-    console.log('📊 [NORMALIZE] Detected MCQ-only response format');
+    console.log('\n📊 [NORMALIZE] Detected MCQ-only response format');
+    console.log('📊 [NORMALIZE] MCQ Results array:', data.results?.length || 0, 'items');
     mcqResults = (data.results || []).map((m: any) => ({
       questionId: m.questionId || m.QuestionId || '',
       questionNumber: m.questionNumber ?? m.QuestionNumber ?? 0,
@@ -125,7 +126,8 @@ function normalizeEvaluationResult(data: any): EvaluationResult {
     }));
   } else {
     // Full evaluation response with questionEvaluations
-    console.log('📊 [NORMALIZE] Detected full evaluation response format');
+    console.log('\n📊 [NORMALIZE] Detected full evaluation response format');
+    console.log('📊 [NORMALIZE] Question Evaluations:', (data.questionEvaluations || data.QuestionEvaluations || []).length, 'items');
     
     // Handle questionEvaluations -> split into MCQ and subjective based on rubricBreakdown presence
     const questionEvaluations = data.questionEvaluations || data.QuestionEvaluations || [];
@@ -136,6 +138,24 @@ function normalizeEvaluationResult(data: any): EvaluationResult {
       
       if (isSubjective) {
         // Subjective question
+        // Parse rubricBreakdown if it's a JSON string
+        let rubricBreakdown = q.rubricBreakdown || q.RubricBreakdown || q.stepAnalysis || q.StepAnalysis || [];
+        if (typeof rubricBreakdown === 'string') {
+          try {
+            rubricBreakdown = JSON.parse(rubricBreakdown);
+            if (rubricBreakdown && !Array.isArray(rubricBreakdown)) {
+              // If it's an object, try to convert to array
+              rubricBreakdown = Object.values(rubricBreakdown);
+            }
+          } catch (e) {
+            console.log('⚠️ [NORMALIZE] Could not parse rubricBreakdown string:', rubricBreakdown);
+            rubricBreakdown = [];
+          }
+        }
+        if (!Array.isArray(rubricBreakdown)) {
+          rubricBreakdown = [];
+        }
+        
         subjectiveResults.push({
           questionId: q.questionId || q.QuestionId || '',
           questionNumber: q.questionNumber ?? q.QuestionNumber ?? 0,
@@ -144,10 +164,10 @@ function normalizeEvaluationResult(data: any): EvaluationResult {
           maxMarks: q.maxScore ?? q.MaxScore ?? q.maxMarks ?? q.MaxMarks ?? 0,
           isFullyCorrect: (q.awardedScore ?? q.AwardedScore ?? 0) >= (q.maxScore ?? q.MaxScore ?? 0),
           expectedAnswer: q.modelAnswer || q.ModelAnswer || q.expectedAnswer || q.ExpectedAnswer || '',
-          studentAnswerEcho: q.studentAnswer || q.StudentAnswer || q.studentAnswerEcho || q.StudentAnswerEcho || '',
+          studentAnswerEcho: q.extractedAnswer || q.studentAnswer || q.StudentAnswer || q.studentAnswerEcho || q.StudentAnswerEcho || q.ExtractedAnswer || '',
           overallFeedback: q.feedback || q.Feedback || q.overallFeedback || q.OverallFeedback || '',
           // Map rubricBreakdown -> stepAnalysis
-          stepAnalysis: (q.rubricBreakdown || q.RubricBreakdown || q.stepAnalysis || q.StepAnalysis || []).map((r: any, idx: number) => ({
+          stepAnalysis: rubricBreakdown.map((r: any, idx: number) => ({
             step: idx + 1,
             description: r.criterion || r.Criterion || r.description || r.Description || `Step ${idx + 1}`,
             isCorrect: (r.awarded ?? r.Awarded ?? 0) > 0,
@@ -206,10 +226,19 @@ function normalizeEvaluationResult(data: any): EvaluationResult {
   const grade = data.grade || data.Grade || calculateGrade(percentage);
   const passed = data.passed ?? data.Passed ?? percentage >= 35;
 
-  console.log('📊 [NORMALIZE] MCQ count:', mcqResults.length, 'Subjective count:', subjectiveResults.length);
-  console.log('📊 [NORMALIZE] MCQ Score:', mcqTotalScore, '/', mcqTotalMarks);
-  console.log('📊 [NORMALIZE] Subjective Score:', subjectiveTotalScore, '/', subjectiveTotalMarks);
-  console.log('📊 [NORMALIZE] Total:', totalScore, '/', maxScore, '=', percentage.toFixed(2), '%');
+  console.log('\n═══════════════════════════════════════════════════════════');
+  console.log('🔄 [NORMALIZATION] Processing Results');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('📝 MCQ Questions:', mcqResults.length);
+  console.log('📝 Subjective Questions:', subjectiveResults.length);
+  console.log('───────────────────────────────────────────────────────────');
+  console.log('✅ MCQ Score:', mcqTotalScore, '/', mcqTotalMarks, `(${mcqTotalMarks > 0 ? ((mcqTotalScore/mcqTotalMarks)*100).toFixed(1) : 0}%)`);
+  console.log('✅ Subjective Score:', subjectiveTotalScore, '/', subjectiveTotalMarks, `(${subjectiveTotalMarks > 0 ? ((subjectiveTotalScore/subjectiveTotalMarks)*100).toFixed(1) : 0}%)`);
+  console.log('───────────────────────────────────────────────────────────');
+  console.log('🎯 Grand Total:', totalScore, '/', maxScore, '=', percentage.toFixed(2), '%');
+  console.log('📊 Grade:', grade);
+  console.log('✔️  Passed:', passed ? 'YES' : 'NO');
+  console.log('═══════════════════════════════════════════════════════════\n');
 
   return {
     examId: data.examId || data.ExamId || data.submissionId || data.SubmissionId || '',
@@ -445,11 +474,36 @@ export async function getEvaluationResultsBySubmissionId(
         throw new Error(errorMessage);
       }
 
-      console.log('📊 [GET RESULTS] Successfully fetched results!');
-      console.log('📊 [GET RESULTS] Data keys:', Object.keys(data));
-      console.log('📊 [GET RESULTS] grandScore:', data.grandScore, 'GrandScore:', data.GrandScore);
-      console.log('📊 [GET RESULTS] percentage:', data.percentage, 'Percentage:', data.Percentage);
-      console.log('📊 [GET RESULTS] Sample data:', JSON.stringify(data).substring(0, 500));
+      console.log('\n═══════════════════════════════════════════════════════════');
+      console.log('📊 [EVALUATION RESULTS] Successfully Fetched!');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('📦 Full API Response:');
+      console.log(JSON.stringify(data, null, 2));
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🔑 Data Keys:', Object.keys(data).join(', '));
+      console.log('📊 Grand Score:', data.grandScore || data.GrandScore || data.totalScore || data.TotalScore || 'N/A');
+      console.log('📊 Total Marks:', data.grandTotalMarks || data.GrandTotalMarks || data.maxScore || data.MaxScore || 'N/A');
+      console.log('📊 Percentage:', data.percentage || data.Percentage || 'N/A');
+      console.log('📊 Grade:', data.grade || data.Grade || 'N/A');
+      console.log('📊 Passed:', data.passed || data.Passed || 'N/A');
+      console.log('═══════════════════════════════════════════════════════════\n');
+      
+      // Check if data has nested evaluationResult field (new API format)
+      if (data.evaluationResult && !data.questionEvaluations) {
+        console.log('📊 [GET RESULTS] Detected nested evaluationResult format - extracting...');
+        // Merge summary data with evaluationResult
+        const mergedData = {
+          ...data.evaluationResult,
+          // Use summary if available for correct totals
+          grandScore: data.summary?.totalScore ?? data.evaluationResult.totalScore,
+          grandTotalMarks: data.summary?.maxPossibleScore ?? data.evaluationResult.maxScore,
+          percentage: data.summary?.percentage ?? data.evaluationResult.percentage,
+          grade: data.summary?.grade ?? data.evaluationResult.grade,
+        };
+        const normalizedResult = normalizeEvaluationResult(mergedData);
+        console.log('📊 [GET RESULTS] Normalized - grand Score:', normalizedResult.grandScore, 'percentage:', normalizedResult.percentage);
+        return normalizedResult;
+      }
       
       // Normalize the response to handle PascalCase vs camelCase differences
       const normalizedResult = normalizeEvaluationResult(data);

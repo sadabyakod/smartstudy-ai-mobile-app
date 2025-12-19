@@ -38,6 +38,7 @@ import {
   pollSubmissionStatus,
   checkSubmissionStatus,
   SubmissionStatusResponse,
+  mergeExamQuestions,
   isEvaluationComplete,
   isEvaluationFailed,
 } from "../services/pucExamApi";
@@ -159,14 +160,35 @@ export default function PUCExamScreen() {
   // Check for completed evaluation from navigation (e.g., from LearningHub)
   React.useEffect(() => {
     if (completedEvaluation?.result) {
+      console.log('\n═══════════════════════════════════════════════════════════');
       console.log('📊 [PUCExamScreen] Received completedEvaluation from LearningHub!');
+      console.log('═══════════════════════════════════════════════════════════');
       console.log('📊 [PUCExamScreen] Result keys:', Object.keys(completedEvaluation.result));
       console.log('📊 [PUCExamScreen] grandScore:', completedEvaluation.result.grandScore);
-      console.log('📊 [PUCExamScreen] GrandScore (capital):', (completedEvaluation.result as any).GrandScore);
+      console.log('📊 [PUCExamScreen] grandTotalMarks:', completedEvaluation.result.grandTotalMarks);
       console.log('📊 [PUCExamScreen] percentage:', completedEvaluation.result.percentage);
-      console.log('📊 [PUCExamScreen] Percentage (capital):', (completedEvaluation.result as any).Percentage);
+      console.log('📊 [PUCExamScreen] grade:', completedEvaluation.result.grade);
+      console.log('📊 [PUCExamScreen] MCQ Results:', completedEvaluation.result.mcqResults?.length || 0);
+      console.log('📊 [PUCExamScreen] Subjective Results:', completedEvaluation.result.subjectiveResults?.length || 0);
+      if (completedEvaluation.result.subjectiveResults?.length > 0) {
+        console.log('📊 [PUCExamScreen] First Subjective Result Sample:');
+        console.log(JSON.stringify(completedEvaluation.result.subjectiveResults[0], null, 2));
+      }
+      console.log('═══════════════════════════════════════════════════════════\n');
+      
+      // Try to merge question text from generatedExam if available
+      let resultWithQuestions = completedEvaluation.result as any;
+      if (generatedExam && completedEvaluation.result.examId === generatedExam.examId) {
+        console.log('✅ [PUCExamScreen] Merging question text from generatedExam');
+        resultWithQuestions = mergeExamQuestions(completedEvaluation.result as ExamResult, generatedExam);
+        console.log('✅ [PUCExamScreen] Question text merged! Sample question text:', 
+          resultWithQuestions.subjectiveResults?.[0]?.questionText?.substring(0, 50) || 'N/A');
+      } else {
+        console.warn('⚠️ [PUCExamScreen] Cannot merge - generatedExam not available or ID mismatch');
+      }
+      
       // Set the exam result from completed evaluation
-      setExamResult(completedEvaluation.result as any);
+      setExamResult(resultWithQuestions);
       setScore(completedEvaluation.result.grandScore || (completedEvaluation.result as any).GrandScore || 0);
       setWrittenSubmissionId(completedEvaluation.writtenSubmissionId);
       setShowDetailedResults(true);
@@ -174,7 +196,7 @@ export default function PUCExamScreen() {
       // Clear the completed evaluation after consuming it
       setCompletedEvaluation(null);
     }
-  }, [completedEvaluation]);
+  }, [completedEvaluation, generatedExam]);
 
   const currentPart = generatedExam?.parts[currentPartIndex];
   const currentQuestion = currentPart?.questions[currentQuestionIndex];
@@ -195,17 +217,30 @@ export default function PUCExamScreen() {
       setScreenState("loading");
       setErrorMessage(null);
       
+      // Use the correct backend schema with recommended defaults
       const exam = await generatePUCExam({
         subject: selectedSubject,
         grade: selectedGrade,
-        chapter: "All Chapters", // Can be made dynamic later
-        difficulty: "Medium", // Can be made dynamic later
-        examType: "Full Paper", // Full Karnataka 2nd PUC paper
+        chapter: "All Chapters",
+        difficulty: "Medium",
+        examType: "Full Paper",
+        useCache: true,
+        fastMode: true,
       });
       
       console.log('✅ [GENERATE EXAM] Exam generated successfully!');
+      console.log('📝 [GENERATE EXAM] ==================== EXAM DETAILS ====================');
       console.log('📝 [GENERATE EXAM] Exam ID:', exam?.examId);
+      console.log('📝 [GENERATE EXAM] Subject:', exam?.subject);
+      console.log('📝 [GENERATE EXAM] Grade:', exam?.grade);
+      console.log('📝 [GENERATE EXAM] Total Marks:', exam?.totalMarks);
+      console.log('📝 [GENERATE EXAM] Duration:', exam?.duration, 'minutes');
       console.log('📝 [GENERATE EXAM] Parts count:', exam?.parts?.length);
+      console.log('📝 [GENERATE EXAM] Total Questions:', exam?.questionCount);
+      exam?.parts?.forEach((part, idx) => {
+        console.log(`📝 [GENERATE EXAM] Part ${idx + 1}: ${part.partName} - ${part.questionType} - ${part.totalQuestions} questions`);
+      });
+      console.log('📝 [GENERATE EXAM] ================================================');
       
       // Validate exam has parts and questions
       if (!exam || !exam.parts || exam.parts.length === 0) {
@@ -253,8 +288,16 @@ export default function PUCExamScreen() {
   };
 
   const handleStartExam = () => {
+    console.log('▶️ [START EXAM] User clicked Start Exam');
+    console.log('▶️ [START EXAM] Exam ID:', generatedExam?.examId);
+    console.log('▶️ [START EXAM] Student ID:', studentId);
+    console.log('▶️ [START EXAM] Total Parts:', generatedExam?.parts?.length);
+    console.log('▶️ [START EXAM] Total Marks:', generatedExam?.totalMarks);
+    console.log('▶️ [START EXAM] Duration:', generatedExam?.duration, 'minutes');
+    
     // Validate before starting
     if (!generatedExam || !generatedExam.parts || generatedExam.parts.length === 0) {
+      console.log('❌ [START EXAM] No exam data available!');
       Alert.alert("Error", "No exam data available. Please generate an exam first.");
       setScreenState("initial");
       return;
@@ -280,6 +323,7 @@ export default function PUCExamScreen() {
                          part.questionType.toLowerCase().includes("multiple choice");
         if (partIsMcq) {
           startPartIndex = i;
+          console.log('▶️ [START EXAM] Starting from part:', part.partName, '(index', i, ')');
           break;
         }
       }
@@ -300,6 +344,9 @@ export default function PUCExamScreen() {
     setCurrentPartIndex(startPartIndex);
     setCurrentQuestionIndex(0);
     setScreenState("question");
+    console.log('✅ [START EXAM] Exam started successfully! Now showing questions.');
+    console.log('📝 [START EXAM] Current Part:', generatedExam.parts[startPartIndex].partName);
+    console.log('📝 [START EXAM] Questions in part:', generatedExam.parts[startPartIndex].questions.length);
   };
 
   const handleSelectOption = (option: string) => {
@@ -312,6 +359,7 @@ export default function PUCExamScreen() {
   };
 
   const handleNext = () => {
+    console.log('➡️ [NAVIGATION] Moving to next question from Q' + (currentQuestionIndex + 1));
     if (!generatedExam || !generatedExam.parts || !currentPart || !currentPart.questions) return;
     
     const questionsLength = currentPart.questions?.length || 0;
@@ -319,6 +367,7 @@ export default function PUCExamScreen() {
     
     if (currentQuestionIndex < questionsLength - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
+      console.log('➡️ [NAVIGATION] Moved to Q' + (currentQuestionIndex + 2) + ' in same part');
     } else if (currentPartIndex < partsLength - 1) {
       // Check if current part is MCQ and next parts are subjective
       const subjectiveParts = getSubjectiveParts();
@@ -490,7 +539,10 @@ export default function PUCExamScreen() {
       }
       
       console.log('📤 [SUBMIT EXAM] MCQ answers count:', mcqAnswers.length);
+      console.log('📤 [SUBMIT EXAM] MCQ answers:', JSON.stringify(mcqAnswers, null, 2));
       console.log('📤 [SUBMIT EXAM] Written images count:', writtenImageUris.length);
+      console.log('📤 [SUBMIT EXAM] Total user answers:', Object.keys(userAnswers).length);
+      console.log('📤 [SUBMIT EXAM] Total uploaded images:', Object.keys(uploadedImages).length);
       
       if (mcqAnswers.length === 0 && writtenImageUris.length === 0) {
         Alert.alert(
@@ -681,6 +733,7 @@ export default function PUCExamScreen() {
   };
 
   const handleWrittenAnswerChange = (questionId: string, text: string) => {
+    console.log('✍️ [ANSWER] Question', questionId + ':', text.length, 'characters');
     setUserAnswers(prev => ({
       ...prev,
       [questionId]: text,
@@ -688,10 +741,12 @@ export default function PUCExamScreen() {
   };
 
   const handlePickImage = async (questionId: string) => {
+    console.log('📷 [IMAGE] User picking image for question:', questionId);
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (!permissionResult.granted) {
+        console.log('⚠️ [IMAGE] Permission denied for gallery access');
         Alert.alert("Permission Required", "Please allow access to your photo library to upload images.");
         return;
       }
@@ -703,6 +758,8 @@ export default function PUCExamScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
+        console.log('✅ [IMAGE] Image selected for question:', questionId);
+        console.log('📷 [IMAGE] URI:', result.assets[0].uri.substring(0, 50) + '...');
         setUploadedImages(prev => ({
           ...prev,
           [questionId]: result.assets[0].uri,
@@ -713,15 +770,18 @@ export default function PUCExamScreen() {
         }));
       }
     } catch (error) {
+      console.log('❌ [IMAGE] Failed to pick image:', error);
       Alert.alert("Error", "Failed to pick image. Please try again.");
     }
   };
 
   const handleTakePhoto = async (questionId: string) => {
+    console.log('📸 [CAMERA] User taking photo for question:', questionId);
     try {
       const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
       
       if (!permissionResult.granted) {
+        console.log('⚠️ [CAMERA] Permission denied for camera access');
         Alert.alert("Permission Required", "Please allow access to your camera to take photos.");
         return;
       }
@@ -732,6 +792,8 @@ export default function PUCExamScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
+        console.log('✅ [CAMERA] Photo captured for question:', questionId);
+        console.log('📸 [CAMERA] URI:', result.assets[0].uri.substring(0, 50) + '...');
         setUploadedImages(prev => ({
           ...prev,
           [questionId]: result.assets[0].uri,
@@ -1384,7 +1446,10 @@ export default function PUCExamScreen() {
 
   // Question Paper Screen - Board Exam Style View for Subjective Questions
   if (screenState === "questionPaper" && generatedExam) {
+    console.log('📄 [QUESTION PAPER] Showing question paper screen');
+    console.log('📄 [QUESTION PAPER] Exam ID:', generatedExam.examId);
     const subjectiveParts = getSubjectiveParts();
+    console.log('📄 [QUESTION PAPER] Subjective parts count:', subjectiveParts.length);
     let questionNumber = 0;
 
     return (
@@ -2055,23 +2120,6 @@ export default function PUCExamScreen() {
             contentContainerStyle={styles.resultsContainer}
             showsVerticalScrollIndicator={true}
           >
-            {/* Debug Info - Remove after testing */}
-            <View style={{ backgroundColor: '#FFF', padding: 12, margin: 16, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB' }}>
-              <Text style={{ fontWeight: 'bold', marginBottom: 8 }}>Debug Info:</Text>
-              <Text>Has examResult: {examResult ? 'Yes' : 'No'}</Text>
-              <Text>Has mcqResult: {mcqResult ? 'Yes' : 'No'}</Text>
-              <Text>Has generatedExam: {generatedExam ? 'Yes' : 'No'}</Text>
-              <Text>User answers count: {Object.keys(userAnswers).length}</Text>
-              <Text>Uploaded images: {Object.keys(uploadedImages).length}</Text>
-              {examResult && (
-                <>
-                  <Text>Grand Score: {examResult.grandScore}</Text>
-                  <Text>MCQ Results: {examResult.mcqResults?.length || 0}</Text>
-                  <Text>Subjective Results: {examResult.subjectiveResults?.length || 0}</Text>
-                </>
-              )}
-            </View>
-            
             {/* Result Icon */}
             <View style={[styles.resultIcon, { backgroundColor: gradeColor }]}>
               <Ionicons
@@ -2213,14 +2261,16 @@ export default function PUCExamScreen() {
                   Detailed AI evaluation of your handwritten answers
                 </Text>
                 {examResult.subjectiveResults.map((result: any, index: number) => {
+                  console.log(`\n📝 [Subjective Q${index + 1}] Rendering result:`, JSON.stringify(result, null, 2));
                   const scoreEarned = result.earnedMarks ?? result.awardedScore ?? 0;
                   const maxMarks = result.maxMarks ?? result.maxScore ?? 0;
                   const scorePercent = maxMarks > 0 ? (scoreEarned / maxMarks) * 100 : 0;
                   const scoreColor = scorePercent >= 80 ? '#22C55E' : scorePercent >= 60 ? '#F97316' : '#EF4444';
                   const isFullMarks = scorePercent >= 100;
-                  const studentAnswer = result.studentAnswerEcho || result.studentAnswer || '';
+                  const studentAnswer = result.studentAnswerEcho || result.studentAnswer || result.extractedAnswer || '';
                   const modelAnswer = result.expectedAnswer || result.modelAnswer || '';
                   const feedback = result.overallFeedback || result.feedback || '';
+                  console.log(`📝 [Q${index + 1}] Extracted values - Score: ${scoreEarned}/${maxMarks}, Student: ${studentAnswer ? 'YES' : 'NO'}, Model: ${modelAnswer ? 'YES' : 'NO'}, Feedback: ${feedback ? 'YES' : 'NO'}`);
                   
                   return (
                     <View key={result.questionId || index} style={styles.subjectiveResultCard}>
@@ -2260,12 +2310,12 @@ export default function PUCExamScreen() {
                       )}
                       
                       {/* Student's Answer (extracted from image via OCR) */}
-                      {studentAnswer && (
-                        <View style={styles.studentAnswerSection}>
-                          <Text style={styles.sectionLabel}>✏️ Your Answer (from image):</Text>
-                          <Text style={styles.studentAnswerText}>{studentAnswer}</Text>
-                        </View>
-                      )}
+                      <View style={styles.studentAnswerSection}>
+                        <Text style={styles.sectionLabel}>✏️ Your Answer (from image):</Text>
+                        <Text style={styles.studentAnswerText}>
+                          {studentAnswer || '[Not answered or answer not detected in uploaded image]'}
+                        </Text>
+                      </View>
                       
                       {/* AI Feedback */}
                       {feedback && (

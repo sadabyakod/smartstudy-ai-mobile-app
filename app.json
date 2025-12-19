@@ -3,15 +3,33 @@
     "name": "Study Assistant",
     "slug": "studyassistant",
     "version": "11",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "updates": {
+      "enabled": false
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "android": {
       "package": "com.sadashivbyakod.smartstudyaichatbot",
       "versionCode": 11,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_WIFI_STATE"
+      ]
     },
     "ios": {
       "bundleIdentifier": "com.sadashivbyakod.smartstudyaichatbot"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "studyassistant-dev"
+      }
     }
   }
 }

@@ -8,6 +8,8 @@ export interface GenerateExamRequest {
   chapter?: string;
   difficulty?: string;
   examType?: string;
+  useCache?: boolean;
+  fastMode?: boolean;
 }
 
 export interface SubPart {
@@ -272,32 +274,108 @@ export async function generatePUCExam(
   request: GenerateExamRequest
 ): Promise<GeneratedExam> {
   try {
+    const apiUrl = `${API_BASE_URL}/api/exam-generator/generate-exam`;
+    const requestPayload = {
+      subject: request.subject,
+      grade: request.grade,
+      chapter: request.chapter || "All Chapters",
+      difficulty: request.difficulty || "Medium",
+      examType: request.examType || "Full Paper",
+      useCache: request.useCache !== undefined ? request.useCache : true,
+      fastMode: request.fastMode !== undefined ? request.fastMode : true
+    };
+    
+    console.log('\n═══════════════════════════════════════════════════════════');
+    console.log('🚀 [API REQUEST] Generating PUC Exam');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📍 Endpoint:', 'POST', apiUrl);
+    console.log('📦 Request Payload:');
+    console.log(JSON.stringify(requestPayload, null, 2));
+    console.log('⏰ Timeout:', '120 seconds (2 minutes)');
+    console.log('═══════════════════════════════════════════════════════════\n');
+    
     const response = await pucFetchWithTimeout(
-      `${API_BASE_URL}/api/exam/generate`,
+      apiUrl,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify(requestPayload),
       },
       120000 // 2 minutes timeout for exam generation (AI takes time)
     );
 
+    console.log('\n═══════════════════════════════════════════════════════════');
+    console.log('📥 [API RESPONSE] Received');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📊 Status:', response.status, response.statusText);
+    console.log('🔗 URL:', apiUrl);
+    console.log('═══════════════════════════════════════════════════════════\n');
+    
     if (!response.ok) {
+      // Try to get error details from response body
+      let errorDetails = '';
+      try {
+        const errorBody = await response.text();
+        errorDetails = errorBody;
+        console.log('\n❌❌❌ [API ERROR] Response Error ❌❌❌');
+        console.log('Status:', response.status);
+        console.log('Response Body:');
+        console.log(errorBody);
+      } catch (e) {
+        console.log('❌ [API ERROR] Could not read response body');
+      }
+      
       throw new ApiError(ERROR_MESSAGES.SERVER_ERROR, response.status);
     }
 
     const examData = await response.json();
-    console.log('🎯 [API RESPONSE] ExamId from API:', examData?.examId);
-    console.log('🎯 [API RESPONSE] Full exam response:', JSON.stringify({
-      examId: examData?.examId,
-      subject: examData?.subject,
-      grade: examData?.grade,
-      totalMarks: examData?.totalMarks,
-      duration: examData?.duration,
-      partsCount: examData?.parts?.length,
-    }));
+    
+    console.log('\n═══════════════════════════════════════════════════════════');
+    console.log('📋 [API RESPONSE] Exam Data Received');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📝 Exam ID:', examData?.examId || 'MISSING');
+    console.log('📚 Subject:', examData?.subject || 'MISSING');
+    console.log('🎓 Grade:', examData?.grade || 'MISSING');
+    console.log('📖 Chapter:', examData?.chapter || 'MISSING');
+    console.log('⭐ Difficulty:', examData?.difficulty || 'MISSING');
+    console.log('📄 Exam Type:', examData?.examType || 'MISSING');
+    console.log('💯 Total Marks:', examData?.totalMarks || 'MISSING');
+    console.log('⏱️ Duration:', examData?.duration || 'MISSING', 'minutes');
+    console.log('🔢 Parts Count:', examData?.parts?.length || 0);
+    console.log('📦 Full Response (JSON):');
+    console.log(JSON.stringify(examData, null, 2));
+    console.log('═══════════════════════════════════════════════════════════\n');
+    
+    // Validate response has required data
+    if (!examData || Object.keys(examData).length === 0) {
+      console.error('\n❌❌❌ VALIDATION ERROR ❌❌❌');
+      console.error('Backend returned EMPTY response object!');
+      console.error('Expected: Exam object with examId, subject, grade, parts, etc.');
+      console.error('Received: {}');
+      throw new ApiError('Backend returned empty exam data. The backend service may be initializing or encountering an error.', 500);
+    }
+    
+    if (!examData.examId) {
+      console.error('\n❌❌❌ VALIDATION ERROR ❌❌❌');
+      console.error('Missing examId in response!');
+      console.error('Response data:', JSON.stringify(examData, null, 2));
+      throw new ApiError('Backend returned invalid exam data (missing examId). Please check backend logs.', 500);
+    }
+    
+    if (!examData.parts || examData.parts.length === 0) {
+      console.error('\n❌❌❌ VALIDATION ERROR ❌❌❌');
+      console.error('Missing or empty parts array in response!');
+      console.error('Parts value:', examData.parts);
+      throw new ApiError('Backend returned exam without questions. Please check backend configuration.', 500);
+    }
+    
+    console.log('\n✅✅✅ SUCCESS ✅✅✅');
+    console.log('Exam data validated successfully!');
+    console.log('Exam ID:', examData.examId);
+    console.log('Parts:', examData.parts.length);
+    console.log('═══════════════════════════════════════════════════════════\n');
     return examData;
   } catch (error: any) {
     if (error instanceof ApiError) {
@@ -572,7 +650,13 @@ export async function uploadWrittenAnswers(
     }
 
     const result = await response.json();
-    console.log('✅ [UPLOAD] Success! Submission ID:', result.writtenSubmissionId);
+    console.log('\n========================================');
+    console.log('✅ [UPLOAD] Written Answer Sheet Uploaded Successfully');
+    console.log('📋 Submission ID:', result.writtenSubmissionId);
+    console.log('📚 Exam ID:', examId);
+    console.log('👤 Student ID:', studentId);
+    console.log('⏰ Timestamp:', new Date().toISOString());
+    console.log('========================================\n');
     
     return result;
   } catch (error: any) {
@@ -594,6 +678,10 @@ export async function getExamResults(
   studentId: string
 ): Promise<ExamResult> {
   try {
+    console.log('\n🔍 [GET RESULTS] Fetching exam results...');
+    console.log('📚 Exam ID:', examId);
+    console.log('👤 Student ID:', studentId);
+    
     const response = await pucFetchWithTimeout(
       `${API_BASE_URL}/api/exam/result/${examId}/${studentId}`,
       {
@@ -606,13 +694,20 @@ export async function getExamResults(
     );
 
     if (!response.ok) {
+      console.log('❌ [GET RESULTS] Failed with status:', response.status);
       throw new ApiError(
         "Results are not available yet. Please wait a moment and try again.",
         response.status
       );
     }
 
-    return await response.json();
+    const results = await response.json();
+    console.log('✅ [GET RESULTS] Results retrieved successfully');
+    console.log('   - MCQ Questions:', results.mcqResult?.length || 0);
+    console.log('   - Subjective Questions:', results.subjectiveResults?.length || 0);
+    console.log('   - Total Score:', results.totalScore || 'N/A');
+    
+    return results;
   } catch (error: any) {
     if (error instanceof ApiError) {
       throw error;
@@ -621,6 +716,33 @@ export async function getExamResults(
     throw new ApiError(getUserFriendlyErrorMessage(error), 0,
       error.message?.includes('Network') || error.message?.includes('fetch'));
   }
+}
+
+/**
+ * Merge exam question text into evaluation results
+ * Call this with the GeneratedExam object to populate question text
+ */
+export function mergeExamQuestions(results: ExamResult, exam: GeneratedExam): ExamResult {
+  // Create a map of questionId to question text
+  const questionMap = new Map<string, string>();
+  exam.parts.forEach(part => {
+    part.questions.forEach(q => {
+      questionMap.set(q.questionId, q.questionText);
+    });
+  });
+  
+  // Merge question text into results
+  return {
+    ...results,
+    subjectiveResults: results.subjectiveResults?.map(result => ({
+      ...result,
+      questionText: questionMap.get(result.questionId) || result.questionText || ''
+    })) || [],
+    mcqResults: results.mcqResults?.map(result => ({
+      ...result,
+      questionText: questionMap.get(result.questionId) || result.questionText || ''
+    })) || []
+  };
 }
 
 /**
@@ -634,6 +756,10 @@ export async function checkSubmissionStatus(
   writtenSubmissionId: string
 ): Promise<SubmissionStatusResponse> {
   try {
+    console.log('🔍 [STATUS CHECK] Checking submission status...');
+    console.log('📋 Submission ID:', writtenSubmissionId);
+    console.log('⏰ Timestamp:', new Date().toISOString());
+    
     const response = await pucFetchWithTimeout(
       `${API_BASE_URL}/api/exam/submission-status/${writtenSubmissionId}`,
       {
@@ -646,6 +772,7 @@ export async function checkSubmissionStatus(
     );
 
     if (!response.ok) {
+      console.log('❌ [STATUS CHECK] Failed with status:', response.status);
       if (response.status === 404) {
         throw new ApiError(
           'Submission not found. Please check and try again.',
@@ -655,7 +782,12 @@ export async function checkSubmissionStatus(
       throw new ApiError(ERROR_MESSAGES.SERVER_ERROR, response.status);
     }
 
-    return await response.json();
+    const statusData = await response.json();
+    console.log('✅ [STATUS CHECK] Response received:');
+    console.log('   - Status:', statusData.status);
+    console.log('   - Is Complete:', statusData.isComplete);
+    console.log('   - Message:', statusData.message || 'N/A');
+    return statusData;
   } catch (error: any) {
     if (error instanceof ApiError) {
       throw error;
@@ -688,14 +820,25 @@ export async function pollSubmissionStatus(
     const poll = async () => {
       try {
         attempts++;
+        console.log('\n🔄 [POLLING] Attempt', attempts, 'of', maxAttempts);
+        console.log('📋 Submission ID:', writtenSubmissionId);
         
         const statusData = await checkSubmissionStatus(writtenSubmissionId);
+        
+        console.log('📊 [POLLING] Current Status:', statusData.status);
+        console.log('⏳ [POLLING] Is Complete:', statusData.isComplete);
         
         // Call the status update callback
         onStatusUpdate(statusData);
         
         // Check if evaluation is complete
         if (statusData.isComplete) {
+          console.log('\n========================================');
+          console.log('✅ [POLLING] Evaluation Complete!');
+          console.log('📋 Submission ID:', writtenSubmissionId);
+          console.log('⏰ Total Attempts:', attempts);
+          console.log('⏱️  Total Time:', (attempts * pollInterval / 1000).toFixed(1), 'seconds');
+          console.log('========================================\n');
           clearInterval(pollIntervalId);
           resolve(statusData);
           return;
