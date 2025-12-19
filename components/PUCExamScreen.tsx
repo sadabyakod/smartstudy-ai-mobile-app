@@ -138,6 +138,8 @@ export default function PUCExamScreen() {
   const [writtenSubmissionId, setWrittenSubmissionId] = useState<string | null>(null);
   const [evaluationStatus, setEvaluationStatus] = useState<SubmissionStatusResponse | null>(null);
   const [showDetailedResults, setShowDetailedResults] = useState(false);
+  const [showMcqResults, setShowMcqResults] = useState(true);
+  const [showSubjectiveResults, setShowSubjectiveResults] = useState(true);
 
   // Check for completed evaluation from navigation (e.g., from LearningHub)
   React.useEffect(() => {
@@ -280,6 +282,7 @@ export default function PUCExamScreen() {
     // Validate before starting
     if (!generatedExam || !generatedExam.parts || generatedExam.parts.length === 0) {
       console.log('❌ [START EXAM] No exam data available!');
+      console.log('📱 [ALERT] Error: No exam data available. Please generate an exam first.');
       Alert.alert("Error", "No exam data available. Please generate an exam first.");
       setScreenState("initial");
       return;
@@ -318,6 +321,7 @@ export default function PUCExamScreen() {
         setScreenState("questionPaper");
         return;
       }
+      console.log('📱 [ALERT] Error: No questions available in the exam. Please try generating again.');
       Alert.alert("Error", "No questions available in the exam. Please try generating again.");
       setScreenState("initial");
       return;
@@ -462,6 +466,7 @@ export default function PUCExamScreen() {
     const totalQuestions = generatedExam?.questionCount || 0;
     const skippedCount = skippedQuestions.size;
     
+    console.log(`📱 [ALERT] Submit Exam? Answered ${answeredCount}/${totalQuestions}, Skipped: ${skippedCount}`);
     Alert.alert(
       "Submit Exam?",
       `You have answered ${answeredCount} out of ${totalQuestions} questions.${skippedCount > 0 ? `\n\nSkipped: ${skippedCount} questions` : ''}\n\nDo you want to submit your exam for evaluation?`,
@@ -527,6 +532,7 @@ export default function PUCExamScreen() {
       console.log('📤 [SUBMIT EXAM] Total uploaded images:', Object.keys(uploadedImages).length);
       
       if (mcqAnswers.length === 0 && writtenImageUris.length === 0) {
+        console.log('📱 [ALERT] No Answers: Please answer at least one question before submitting.');
         Alert.alert(
           "No Answers",
           "Please answer at least one question before submitting.",
@@ -551,7 +557,15 @@ export default function PUCExamScreen() {
       if (writtenImageUris.length > 0) {
         console.log('📤 [SUBMIT EXAM] Uploading written answers...');
         setSubmissionStatus("Uploading written answers for AI evaluation...");
-        const uploadResult = await uploadWrittenAnswers(generatedExam.examId, studentId, writtenImageUris);
+        
+        // Convert mcqAnswers array to Record<string, string> format for the API
+        const mcqAnswersRecord: Record<string, string> = {};
+        for (const mcq of mcqAnswers) {
+          mcqAnswersRecord[mcq.questionId] = mcq.selectedOption;
+        }
+        console.log('📤 [SUBMIT EXAM] MCQ Answers Record:', JSON.stringify(mcqAnswersRecord));
+        
+        const uploadResult = await uploadWrittenAnswers(generatedExam.examId, studentId, writtenImageUris, mcqAnswersRecord);
         
         console.log('✅ [SUBMIT EXAM] Written answers uploaded!');
         console.log('📤 [SUBMIT EXAM] Submission ID:', uploadResult.writtenSubmissionId);
@@ -604,6 +618,7 @@ export default function PUCExamScreen() {
     } catch (error: any) {
       // Handle 409 Conflict - duplicate submission
       if (error?.status === 409) {
+        console.log('📱 [ALERT] Already Submitted (409): Duplicate submission not allowed');
         Alert.alert(
           "Already Submitted",
           "⚠️ You have already submitted answers for this exam. Duplicate submissions are not allowed.",
@@ -618,6 +633,7 @@ export default function PUCExamScreen() {
                     setScreenState("results");
                   })
                   .catch(() => {
+                    console.log('📱 [ALERT] Results Not Ready: Your previous submission is still being evaluated.');
                     Alert.alert("Results Not Ready", "Your previous submission is still being evaluated. Please try again later.");
                     setScreenState("initial");
                   });
@@ -629,6 +645,7 @@ export default function PUCExamScreen() {
         return;
       }
       
+      console.log('📱 [ALERT] Submission Failed:', error?.message || 'Failed to submit exam');
       Alert.alert(
         "Submission Failed",
         error?.message || "Failed to submit exam. Would you like to try again or calculate score locally?",
@@ -729,6 +746,7 @@ export default function PUCExamScreen() {
       
       if (!permissionResult.granted) {
         console.log('⚠️ [IMAGE] Permission denied for gallery access');
+        console.log('📱 [ALERT] Permission Required: Please allow access to your photo library.');
         Alert.alert("Permission Required", "Please allow access to your photo library to upload images.");
         return;
       }
@@ -753,6 +771,7 @@ export default function PUCExamScreen() {
       }
     } catch (error) {
       console.log('❌ [IMAGE] Failed to pick image:', error);
+      console.log('📱 [ALERT] Error: Failed to pick image. Please try again.');
       Alert.alert("Error", "Failed to pick image. Please try again.");
     }
   };
@@ -764,6 +783,7 @@ export default function PUCExamScreen() {
       
       if (!permissionResult.granted) {
         console.log('⚠️ [CAMERA] Permission denied for camera access');
+        console.log('📱 [ALERT] Permission Required: Please allow access to your camera.');
         Alert.alert("Permission Required", "Please allow access to your camera to take photos.");
         return;
       }
@@ -786,6 +806,8 @@ export default function PUCExamScreen() {
         }));
       }
     } catch (error) {
+      console.log('❌ [CAMERA] Failed to take photo:', error);
+      console.log('📱 [ALERT] Error: Failed to take photo. Please try again.');
       Alert.alert("Error", "Failed to take photo. Please try again.");
     }
   };
@@ -851,6 +873,7 @@ export default function PUCExamScreen() {
   const handlePickAnswerSheet = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
+      console.log('📱 [ALERT] Permission Required: Camera roll permissions needed for answer sheet.');
       Alert.alert("Permission Required", "Please grant camera roll permissions to upload your answer sheet.");
       return;
     }
@@ -870,6 +893,7 @@ export default function PUCExamScreen() {
   const handleTakeAnswerSheetPhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
+      console.log('📱 [ALERT] Permission Required: Camera permissions needed to take photos.');
       Alert.alert("Permission Required", "Please grant camera permissions to take photos.");
       return;
     }
@@ -1560,6 +1584,7 @@ export default function PUCExamScreen() {
   if (screenState === "uploadAnswers" && generatedExam) {
     const handleSubmitAnswerSheets = async () => {
       if (answerSheetImages.length === 0) {
+        console.log('📱 [ALERT] No Images: Please upload at least one photo of your answer sheet.');
         Alert.alert("No Images", "Please upload at least one photo of your answer sheet.");
         return;
       }
@@ -1572,7 +1597,31 @@ export default function PUCExamScreen() {
         // Upload answer sheet images
         setSubmissionStatus("Uploading answer sheets for AI evaluation...");
         
-        const uploadResult = await uploadWrittenAnswers(generatedExam.examId, studentId, answerSheetImages);
+        // Convert userAnswers to MCQ format for the API
+        // userAnswers contains MCQ selections like { "A1": "A", "A2": "B" }
+        const mcqAnswersRecord: Record<string, string> = {};
+        if (generatedExam) {
+          for (const part of generatedExam.parts) {
+            for (const question of part.questions) {
+              if (isMCQ(question) && userAnswers[question.questionId]) {
+                // Extract the option letter from the answer (e.g., "A" from "A) Answer")
+                const answer = userAnswers[question.questionId];
+                const optionMatch = answer.match(/^([A-D])\)/);
+                mcqAnswersRecord[question.questionId] = optionMatch ? optionMatch[1] : answer;
+              }
+            }
+          }
+        }
+        console.log('📤 [UPLOAD SHEETS] MCQ Answers Record:', JSON.stringify(mcqAnswersRecord));
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('📤 [UPLOAD SHEETS] ⚠️ EXAM ID CHECK ⚠️');
+        console.log('📤 [UPLOAD SHEETS] Exam ID being sent:', generatedExam.examId);
+        console.log('📤 [UPLOAD SHEETS] Student ID:', studentId);
+        console.log('📤 [UPLOAD SHEETS] Number of images:', answerSheetImages.length);
+        console.log('📤 [UPLOAD SHEETS] This exam ID should match the one from exam generation!');
+        console.log('═══════════════════════════════════════════════════════════');
+        
+        const uploadResult = await uploadWrittenAnswers(generatedExam.examId, studentId, answerSheetImages, mcqAnswersRecord);
         
         // Save submission ID for tracking
         setWrittenSubmissionId(uploadResult.writtenSubmissionId);
@@ -1587,6 +1636,7 @@ export default function PUCExamScreen() {
         });
         
         // Show success message and navigate to home
+        console.log('📱 [ALERT] ✅ Upload Successful! AI evaluation is in progress.');
         Alert.alert(
           "✅ Upload Successful!",
           "Your answer sheet has been uploaded successfully. AI evaluation is in progress. You can check the status from the home screen.",
@@ -1608,6 +1658,7 @@ export default function PUCExamScreen() {
       } catch (error: any) {
         // Handle 409 Conflict - duplicate submission
         if (error?.status === 409) {
+          console.log('📱 [ALERT] Already Submitted (409): Duplicate submission not allowed');
           Alert.alert(
             "Already Submitted",
             "⚠️ You have already submitted answers for this exam. Duplicate submissions are not allowed.",
@@ -1623,6 +1674,7 @@ export default function PUCExamScreen() {
                       setScreenState("results");
                     })
                     .catch(() => {
+                      console.log('📱 [ALERT] Results Not Ready: Previous submission still being evaluated.');
                       Alert.alert("Results Not Ready", "Your previous submission is still being evaluated. Please try again later.");
                       setScreenState("initial");
                     });
@@ -1635,6 +1687,7 @@ export default function PUCExamScreen() {
         }
         
         // Handle other errors
+        console.log('📱 [ALERT] Submission Error:', error?.message || 'Failed to submit answer sheets');
         Alert.alert(
           "Submission Error",
           error?.message || "Failed to submit answer sheets. Please try again.",
@@ -1944,6 +1997,7 @@ export default function PUCExamScreen() {
               <TouchableOpacity
                 style={styles.cancelWaitingButton}
                 onPress={() => {
+                  console.log('📱 [ALERT] Cancel Evaluation? User may go back.');
                   Alert.alert(
                     'Cancel Evaluation?',
                     'Your answer sheet will continue to be evaluated in the background. You can check results later.',
@@ -2225,24 +2279,62 @@ export default function PUCExamScreen() {
             {/* MCQ Detailed Results - Only show if we have MCQ data */}
             {finalMcqResults.length > 0 && (
               <View style={styles.feedbackCard}>
-                <Text style={styles.feedbackTitle}>📊 MCQ Detailed Results</Text>
-                <Text style={styles.feedbackSubtitle}>
-                  Tap each question to see options and correct answer
-                </Text>
-                {finalMcqResults.map((mcqRes: any, index: number) => (
-                  <McqResultItem key={mcqRes.questionId || index} mcqRes={mcqRes} styles={styles} />
-                ))}
+                <TouchableOpacity 
+                  style={styles.sectionToggleHeader}
+                  onPress={() => setShowMcqResults(!showMcqResults)}
+                >
+                  <Text style={styles.feedbackTitle}>📊 MCQ Detailed Results</Text>
+                  <Text style={styles.toggleIcon}>{showMcqResults ? '▼' : '▶'}</Text>
+                </TouchableOpacity>
+                {showMcqResults && (
+                  <>
+                    <Text style={styles.feedbackSubtitle}>
+                      Tap each question to see options and correct answer
+                    </Text>
+                    {finalMcqResults.map((mcqRes: any, index: number) => (
+                      <McqResultItem key={mcqRes.questionId || index} mcqRes={mcqRes} styles={styles} />
+                    ))}
+                  </>
+                )}
               </View>
             )}
 
             {/* Subjective Feedback (if API result available) */}
-            {examResult && examResult.subjectiveResults && examResult.subjectiveResults.length > 0 && (
+            {examResult && examResult.subjectiveResults && examResult.subjectiveResults.length > 0 && (() => {
+              // Filter out MCQ-type questions from subjective results
+              // MCQs have expectedAnswer like "A) option" or single letter answers
+              const isMcqQuestion = (result: any): boolean => {
+                const expected = result.expectedAnswer || '';
+                // Check if expected answer is a single letter option (A, B, C, D) or starts with option pattern
+                if (/^[A-D]\)?(\s|$)/i.test(expected.trim())) return true;
+                // Check if questionId suggests MCQ (starts with letter only like "A1", "A2")
+                const qId = result.questionId || '';
+                if (/^[A-E]\d+$/i.test(qId) && result.maxMarks <= 1) return true;
+                // Check if question has options in text (A), (B), etc.
+                const qText = result.questionText || '';
+                if (/\([A-D]\)/i.test(qText) || /\n[A-D]\)/i.test(qText)) return true;
+                return false;
+              };
+              
+              const subjectiveOnlyResults = examResult.subjectiveResults.filter((r: any) => !isMcqQuestion(r));
+              
+              if (subjectiveOnlyResults.length === 0) return null;
+              
+              return (
               <View style={styles.feedbackCard}>
-                <Text style={styles.feedbackTitle}>📝 Subjective Evaluation</Text>
-                <Text style={styles.feedbackSubtitle}>
-                  Detailed AI evaluation of your handwritten answers
-                </Text>
-                {examResult.subjectiveResults.map((result: any, index: number) => {
+                <TouchableOpacity 
+                  style={styles.sectionToggleHeader}
+                  onPress={() => setShowSubjectiveResults(!showSubjectiveResults)}
+                >
+                  <Text style={styles.feedbackTitle}>📝 Subjective Evaluation</Text>
+                  <Text style={styles.toggleIcon}>{showSubjectiveResults ? '▼' : '▶'}</Text>
+                </TouchableOpacity>
+                {showSubjectiveResults && (
+                  <>
+                    <Text style={styles.feedbackSubtitle}>
+                      Detailed AI evaluation of your handwritten answers
+                    </Text>
+                    {subjectiveOnlyResults.map((result: any, index: number) => {
                   console.log(`\n📝 [Subjective Q${index + 1}] Rendering result:`, JSON.stringify(result, null, 2));
                   const scoreEarned = result.earnedMarks ?? result.awardedScore ?? 0;
                   const maxMarks = result.maxMarks ?? result.maxScore ?? 0;
@@ -2368,8 +2460,11 @@ export default function PUCExamScreen() {
                     </View>
                   );
                 })}
+                  </>
+                )}
               </View>
-            )}
+              );
+            })()}
 
             {/* MCQ Results feedback */}
             {mcqResult && mcqResult.results && mcqResult.results.length > 0 && (
@@ -3247,11 +3342,21 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: 20,
   },
+  sectionToggleHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  toggleIcon: {
+    fontSize: 16,
+    color: "#6B7280",
+  },
   feedbackTitle: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#1F2937",
-    marginBottom: 16,
+    marginBottom: 8,
   },
   feedbackItem: {
     backgroundColor: "#F9FAFB",

@@ -80,9 +80,17 @@ export interface McqSubmissionResult {
 }
 
 export interface WrittenSubmissionResult {
-  writtenSubmissionId: string;
-  status: "PendingEvaluation" | "Completed" | "Failed";
+  submissionId: string;  // Backend returns "submissionId" not "writtenSubmissionId"
+  examId: string;
+  studentId: string;
+  status: "processing" | "PendingEvaluation" | "Completed" | "Failed";
+  filesUploaded: number;
+  mcqScore?: number;
+  mcqTotal?: number;
   message: string;
+  correlationId?: string;
+  // Alias for backward compatibility
+  writtenSubmissionId?: string;
 }
 
 // Submission status polling types
@@ -335,7 +343,11 @@ export async function generatePUCExam(
     console.log('\n═══════════════════════════════════════════════════════════');
     console.log('📋 [API RESPONSE] Exam Data Received');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('📝 Exam ID:', examData?.examId || 'MISSING');
+    console.log('� Response Keys:', Object.keys(examData || {}));
+    console.log('📝 examId field:', examData?.examId);
+    console.log('📝 exam_id field:', examData?.exam_id);
+    console.log('📝 id field:', examData?.id);
+    console.log('📝 ExamId field:', examData?.ExamId);
     console.log('📚 Subject:', examData?.subject || 'MISSING');
     console.log('🎓 Grade:', examData?.grade || 'MISSING');
     console.log('📖 Chapter:', examData?.chapter || 'MISSING');
@@ -347,6 +359,20 @@ export async function generatePUCExam(
     console.log('📦 Full Response (JSON):');
     console.log(JSON.stringify(examData, null, 2));
     console.log('═══════════════════════════════════════════════════════════\n');
+    
+    // Normalize examId field - handle different naming conventions from backend
+    if (!examData.examId && examData.exam_id) {
+      console.log('⚠️ [NORMALIZE] Converting exam_id to examId');
+      examData.examId = examData.exam_id;
+    }
+    if (!examData.examId && examData.id) {
+      console.log('⚠️ [NORMALIZE] Converting id to examId');
+      examData.examId = examData.id;
+    }
+    if (!examData.examId && examData.ExamId) {
+      console.log('⚠️ [NORMALIZE] Converting ExamId to examId');
+      examData.examId = examData.ExamId;
+    }
     
     // Validate response has required data
     if (!examData || Object.keys(examData).length === 0) {
@@ -547,21 +573,33 @@ export async function submitMcqAnswers(
 /**
  * Upload written/subjective answers for AI evaluation
  * Supports image uploads of handwritten answers
+ * @param examId - The exam ID
+ * @param studentId - The student ID
+ * @param imageUris - Array of image URIs to upload
+ * @param mcqAnswers - Optional MCQ answers object (e.g., {"A1": "B", "A2": "C"})
  */
 export async function uploadWrittenAnswers(
   examId: string,
   studentId: string,
-  imageUris: string[]
+  imageUris: string[],
+  mcqAnswers?: Record<string, string>
 ): Promise<WrittenSubmissionResult> {
   try {
     console.log('📤 [UPLOAD] Starting upload...');
     console.log('📤 [UPLOAD] ExamId:', examId);
     console.log('📤 [UPLOAD] StudentId:', studentId);
     console.log('📤 [UPLOAD] Image count:', imageUris.length);
+    console.log('📤 [UPLOAD] MCQ Answers:', mcqAnswers ? Object.keys(mcqAnswers).length : 0);
     
     const formData = new FormData();
     formData.append("examId", examId);
     formData.append("studentId", studentId);
+    
+    // Add MCQ answers as JSON string if provided
+    if (mcqAnswers && Object.keys(mcqAnswers).length > 0) {
+      formData.append("mcqAnswers", JSON.stringify(mcqAnswers));
+      console.log('📤 [UPLOAD] MCQ Answers JSON:', JSON.stringify(mcqAnswers));
+    }
     
     for (let i = 0; i < imageUris.length; i++) {
       const uri = imageUris[i];
@@ -601,10 +639,10 @@ export async function uploadWrittenAnswers(
       } as any);
     }
     
-    console.log('📤 [UPLOAD] Sending request to:', `${API_BASE_URL}/api/exam/upload-written`);
+    console.log('📤 [UPLOAD] Sending request to:', `${API_BASE_URL}/api/exam-submission/upload-written`);
     
     const response = await pucFetchWithTimeout(
-      `${API_BASE_URL}/api/exam/upload-written`,
+      `${API_BASE_URL}/api/exam-submission/upload-written`,
       {
         method: "POST",
         body: formData,
@@ -652,11 +690,18 @@ export async function uploadWrittenAnswers(
     const result = await response.json();
     console.log('\n========================================');
     console.log('✅ [UPLOAD] Written Answer Sheet Uploaded Successfully');
-    console.log('📋 Submission ID:', result.writtenSubmissionId);
-    console.log('📚 Exam ID:', examId);
-    console.log('👤 Student ID:', studentId);
+    console.log('📋 Submission ID:', result.submissionId);
+    console.log('📚 Exam ID:', result.examId || examId);
+    console.log('👤 Student ID:', result.studentId || studentId);
+    console.log('📁 Files Uploaded:', result.filesUploaded);
+    console.log('📝 MCQ Score:', result.mcqScore, '/', result.mcqTotal);
+    console.log('📨 Status:', result.status);
+    console.log('💬 Message:', result.message);
     console.log('⏰ Timestamp:', new Date().toISOString());
     console.log('========================================\n');
+    
+    // Add writtenSubmissionId alias for backward compatibility
+    result.writtenSubmissionId = result.submissionId;
     
     return result;
   } catch (error: any) {
