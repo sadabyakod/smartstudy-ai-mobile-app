@@ -3423,6 +3423,7 @@ const styles = StyleSheet.create({
     width: "100%",
     borderRadius: 16,
     overflow: "hidden",
+    marginBottom: 12,
   },
 
   // Question Paper (Board Exam Style) Styles
