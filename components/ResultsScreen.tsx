@@ -515,7 +515,17 @@ function SubjectiveQuestionResultCard({
             </View>
           )}
 
-          {/* Model Answer removed - already included in AI Evaluation feedback */}
+          {/* Model Answer - Show only for subjective questions when not full marks */}
+          {!isFullMarks && (result.expectedAnswer || (result as any).modelAnswer) && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>✅ Model Answer:</Text>
+              <View style={styles.modelAnswerBox}>
+                <Text style={styles.expectedAnswerText}>
+                  {result.expectedAnswer || (result as any).modelAnswer}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Improvement Suggestions */}
           {(result as any).improvementSuggestions && (
