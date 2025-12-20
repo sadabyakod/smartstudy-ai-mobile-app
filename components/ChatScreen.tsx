@@ -1020,13 +1020,13 @@ const styles = StyleSheet.create({
   userMessageWrapper: { 
     alignItems: "flex-end", 
     marginVertical: 6,
-    paddingLeft: 50,
+    paddingLeft: 16,
   },
   botMessageWrapper: {
     flexDirection: "row",
     alignItems: "flex-start",
     marginVertical: 6,
-    paddingRight: 50,
+    paddingRight: 16,
   },
   botAvatarSmall: {
     width: 28,
