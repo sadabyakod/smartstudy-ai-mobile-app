@@ -370,19 +370,44 @@ function McqQuestionResult({
           <View style={styles.answerRow}>
             <View style={[styles.answerBlock, result.isCorrect ? styles.answerCorrect : styles.answerWrong]}>
               <Text style={styles.answerLabel}>Your Answer</Text>
-              <Text style={styles.answerText}>{result.selectedOption}</Text>
+              <Text style={[
+                styles.answerText, 
+                !result.selectedOption && styles.notAnsweredText
+              ]}>
+                {result.selectedOption || 'Not answered'}
+              </Text>
             </View>
             {!result.isCorrect && (
               <View style={[styles.answerBlock, styles.answerCorrect]}>
-                <Text style={styles.answerLabel}>Correct</Text>
+                <Text style={styles.answerLabel}>Correct Answer</Text>
                 <Text style={styles.answerText}>{result.correctAnswer}</Text>
               </View>
             )}
           </View>
+          
+          {/* Correct Answer Banner */}
           {result.isCorrect && (
             <View style={styles.mcqCorrectBanner}>
               <Ionicons name="checkmark-circle" size={18} color="#166534" />
               <Text style={styles.mcqCorrectBannerText}>Your answer is correct!</Text>
+            </View>
+          )}
+          
+          {/* Wrong Answer Feedback */}
+          {!result.isCorrect && (
+            <View style={styles.mcqWrongFeedback}>
+              <Ionicons name="information-circle" size={18} color="#991b1b" />
+              <View style={styles.mcqWrongFeedbackContent}>
+                <Text style={styles.mcqWrongFeedbackTitle}>
+                  {!result.selectedOption ? 'Question Not Attempted' : 'Incorrect Answer'}
+                </Text>
+                <Text style={styles.mcqWrongFeedbackText}>
+                  {!result.selectedOption 
+                    ? `You did not answer this question. The correct answer is: ${result.correctAnswer}`
+                    : `You selected "${result.selectedOption}" but the correct answer is "${result.correctAnswer}". Review this topic to improve your understanding.`
+                  }
+                </Text>
+              </View>
             </View>
           )}
         </View>
@@ -1174,5 +1199,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#1e293b',
+  },
+  notAnsweredText: {
+    fontStyle: 'italic',
+    color: '#94a3b8',
+  },
+  mcqWrongFeedback: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fef2f2',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ef4444',
+  },
+  mcqWrongFeedbackContent: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  mcqWrongFeedbackTitle: {
+    color: '#991b1b',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  mcqWrongFeedbackText: {
+    color: '#7f1d1d',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
