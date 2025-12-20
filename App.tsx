@@ -7,7 +7,7 @@ import ModelPaperScreen from "./components/ModelPaperScreen";
 import PUCExamScreen from "./components/PUCExamScreen";
 import SyllabusScreen from "./components/SyllabusScreen";
 import DownloadModelPapersScreen from "./components/DownloadModelPapersScreen";
-import ResultsScreen from "./components/ResultsScreen";
+ import ResultsScreen from "./components/ResultsScreen";
 import { NavigationContext, Screen, PendingEvaluation, CompletedEvaluationResult, ResultsScreenData } from "./navigation/NavigationContext";
 
 export default function App() {

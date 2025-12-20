@@ -489,14 +489,16 @@ function SubjectiveQuestionResultCard({
             </View>
           </View>
 
-          {/* Step Analysis - NEW! */}
+          {/* Step Analysis - Show only steps up to maxMarks */}
           {result.stepAnalysis && result.stepAnalysis.length > 0 && (
             <View style={styles.detailSection}>
-              <Text style={styles.detailLabel}>📊 Step-by-Step Marking:</Text>
+              <Text style={styles.detailLabel}>📊 Step-by-Step Marking ({maxMarks} marks):</Text>
               <View style={styles.stepsContainer}>
-                {result.stepAnalysis.map((step, stepIndex) => (
-                  <StepAnalysisCard key={stepIndex} step={step} stepIndex={stepIndex} />
-                ))}
+                {result.stepAnalysis
+                  .slice(0, maxMarks) // Only show steps equal to maxMarks
+                  .map((step, stepIndex) => (
+                    <StepAnalysisCard key={stepIndex} step={step} stepIndex={stepIndex} />
+                  ))}
               </View>
             </View>
           )}
