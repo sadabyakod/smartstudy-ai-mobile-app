@@ -89,7 +89,7 @@ export default function ChatScreen() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [inputHeight, setInputHeight] = useState(44);
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [isFirstLoad, setIsFirstLoad] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
