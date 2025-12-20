@@ -504,13 +504,25 @@ function SubjectiveQuestionResultCard({
           )}
 
           {/* AI Feedback - Use overallFeedback from new API */}
-          {/* Note: Model Answer is already included in overallFeedback when student doesn't get full marks */}
           {(result.overallFeedback || (result as any).feedback) && (
             <View style={styles.detailSection}>
               <Text style={styles.detailLabel}>🤖 AI Evaluation:</Text>
               <View style={styles.feedbackBox}>
                 <Text style={styles.feedbackText}>
                   {result.overallFeedback || (result as any).feedback}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Model Answer - Show only when not full marks and feedback doesn't already contain it */}
+          {!isFullMarks && (result.expectedAnswer || (result as any).modelAnswer) && 
+           !(result.overallFeedback || '').includes('Model Answer') && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>📚 Model Answer:</Text>
+              <View style={styles.modelAnswerBox}>
+                <Text style={styles.expectedAnswerText}>
+                  {result.expectedAnswer || (result as any).modelAnswer}
                 </Text>
               </View>
             </View>
