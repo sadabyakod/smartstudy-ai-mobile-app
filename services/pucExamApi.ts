@@ -1,6 +1,6 @@
 import { API_BASE_URL, getUserFriendlyErrorMessage, fetchWithTimeout as baseFetchWithTimeout, ERROR_MESSAGES } from "../config/api";
 
-// Types for Karnataka 2nd PUC Exam Generator
+// Types for Smart Exam Generator
 
 export interface GenerateExamRequest {
   subject: string;
@@ -218,7 +218,7 @@ export interface ExamSubmissionResult {
   evaluatedAt: string;
 }
 
-// Supported subjects for Karnataka 2nd PUC
+// Supported subjects for exams
 export const PUC_SUBJECTS = [
   "Mathematics",
   "Physics",
@@ -230,8 +230,6 @@ export const PUC_SUBJECTS = [
 
 // Supported grades
 export const PUC_GRADES = [
-  "2nd PUC",
-  "1st PUC",
   "Class 12",
   "Class 11",
 ];

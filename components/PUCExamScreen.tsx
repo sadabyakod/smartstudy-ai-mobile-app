@@ -938,9 +938,9 @@ export default function PUCExamScreen() {
               <View style={styles.heroIconContainer}>
                 <Ionicons name="school" size={70} color="#fff" />
               </View>
-              <Text style={styles.heroTitle}>Karnataka 2nd PUC</Text>
+              <Text style={styles.heroTitle}>Smart Exam</Text>
               <Text style={styles.heroSubtitle}>
-                AI-Powered Model Question Paper Generator
+                AI-Powered Question Paper Generator
               </Text>
             </View>
 
@@ -956,7 +956,7 @@ export default function PUCExamScreen() {
               </View>
               <View style={styles.infoRow}>
                 <Ionicons name="checkmark-circle" size={20} color="#4F46E5" />
-                <Text style={styles.infoText}>Karnataka State Board format</Text>
+                <Text style={styles.infoText}>Standard Board exam format</Text>
               </View>
             </View>
 

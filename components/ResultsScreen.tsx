@@ -433,6 +433,47 @@ function SubjectiveQuestionResultCard({
   const scoreColor = scorePercentage >= 80 ? '#22c55e' : scorePercentage >= 50 ? '#f97316' : '#ef4444';
   const isFullMarks = scorePercentage >= 100;
 
+  // Share individual answer evaluation
+  const handleShareAnswer = async () => {
+    try {
+      const questionNum = result.questionNumber || index + 1;
+      const studentAnswer = result.studentAnswerEcho || (result as any).studentAnswer || 'No answer';
+      const modelAnswer = result.expectedAnswer || (result as any).modelAnswer || '';
+      const feedback = result.overallFeedback || (result as any).feedback || '';
+      
+      let shareText = `📝 *Question ${questionNum} Evaluation*\n\n`;
+      shareText += `📌 *Question:*\n${result.questionText || 'N/A'}\n\n`;
+      shareText += `✏️ *My Answer:*\n${studentAnswer}\n\n`;
+      shareText += `🎯 *Score:* ${earnedMarks}/${maxMarks} marks\n\n`;
+      
+      if (result.stepAnalysis && result.stepAnalysis.length > 0) {
+        shareText += `📊 *Step-by-Step Marking:*\n`;
+        result.stepAnalysis.slice(0, maxMarks).forEach((step, i) => {
+          const stepCorrect = step.isCorrect && step.marksAwarded > 0;
+          shareText += `${stepCorrect ? '✅' : '❌'} Step ${i + 1}: ${step.description}\n`;
+        });
+        shareText += `\n`;
+      }
+      
+      if (feedback) {
+        shareText += `🤖 *AI Feedback:*\n${feedback}\n\n`;
+      }
+      
+      if (!isFullMarks && modelAnswer) {
+        shareText += `📚 *Model Answer:*\n${modelAnswer}\n\n`;
+      }
+      
+      shareText += `📱 Evaluated by Smart Study AI`;
+      
+      await Share.share({
+        message: shareText,
+        title: `Question ${questionNum} Evaluation`,
+      });
+    } catch (error) {
+      console.error('Error sharing answer:', error);
+    }
+  };
+
   return (
     <View style={styles.questionCard}>
       <TouchableOpacity
@@ -452,6 +493,13 @@ function SubjectiveQuestionResultCard({
         </View>
         <View style={styles.questionHeaderRight}>
           {isFullMarks && <Text style={styles.fullMarksEmoji}>🎉</Text>}
+          <TouchableOpacity 
+            style={styles.shareAnswerButton} 
+            onPress={handleShareAnswer}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="share-social-outline" size={20} color="#6366f1" />
+          </TouchableOpacity>
           <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={24} color="#64748b" />
         </View>
       </TouchableOpacity>
@@ -871,6 +919,12 @@ const styles = StyleSheet.create({
   fullMarksEmoji: {
     fontSize: 24,
     marginRight: 8,
+  },
+  shareAnswerButton: {
+    padding: 6,
+    marginRight: 8,
+    borderRadius: 8,
+    backgroundColor: '#eef2ff',
   },
 
   // Question Details
