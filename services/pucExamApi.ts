@@ -427,21 +427,27 @@ export async function generatePUCExam(
  * questions will be numbered continuously (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, ...)
  */
 export function normalizeQuestionNumbers(exam: GeneratedExam): GeneratedExam {
-  let globalQuestionNumber = 1;
-  
-  const normalizedParts = exam.parts.map(part => ({
-    ...part,
-    questions: part.questions.map(question => ({
-      ...question,
-      questionNumber: globalQuestionNumber++,
-    })),
-  }));
-  
-  return {
-    ...exam,
-    parts: normalizedParts,
-    questionCount: globalQuestionNumber - 1, // Update total question count
-  };
+  try {
+    let globalQuestionNumber = 1;
+    
+    const normalizedParts = exam.parts.map(part => ({
+      ...part,
+      questions: (part.questions || []).map(question => ({
+        ...question,
+        questionNumber: globalQuestionNumber++,
+      })),
+    }));
+    
+    return {
+      ...exam,
+      parts: normalizedParts,
+      questionCount: globalQuestionNumber - 1, // Update total question count
+    };
+  } catch (error) {
+    console.error('Error normalizing question numbers:', error);
+    // Return original exam if normalization fails
+    return exam;
+  }
 }
 
 // Helper to check if a question is MCQ
