@@ -231,19 +231,14 @@ export default function PUCExamScreen() {
         throw new Error("Generated exam has no parts. Please try again.");
       }
       
-      // Validate each part has questions
-      for (const part of exam.parts) {
-        if (!part.questions || part.questions.length === 0) {
-          // Part has no questions - will be handled gracefully
-        }
-      }
-      
+      console.log('📝 [GENERATE EXAM] Setting exam state...');
       setGeneratedExam(exam);
       setUserAnswers({});
       setCurrentPartIndex(0);
       setCurrentQuestionIndex(0);
       setScore(0);
       setAnswerSheetImages([]);
+      console.log('📝 [GENERATE EXAM] Setting screen state to exam...');
       setScreenState("exam");
       console.log('✅ [GENERATE EXAM] Navigated to exam screen');
     } catch (error: any) {

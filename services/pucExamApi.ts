@@ -50,6 +50,7 @@ export interface GeneratedExam {
   instructions: string[];
   parts: ExamPart[];
   questionCount: number;
+  questions: ExamQuestion[]; // Root-level questions array (usually empty, questions are in parts)
   createdAt: string;
 }
 
@@ -401,9 +402,15 @@ export async function generatePUCExam(
     console.log('Exam ID:', examData.examId);
     console.log('Parts:', examData.parts.length);
     
-    // Normalize question numbers to be continuous across all parts
-    examData = normalizeQuestionNumbers(examData);
-    console.log('🔢 Question numbers normalized to be continuous across all sections');
+    // Backend already returns continuous question numbers (1-9), but normalize for safety
+    try {
+      examData = normalizeQuestionNumbers(examData);
+      console.log('🔢 Question numbers normalized to be continuous across all sections');
+    } catch (normalizeError) {
+      console.warn('⚠️ Question number normalization skipped:', normalizeError);
+      // Continue with original exam data if normalization fails
+    }
+    
     console.log('═══════════════════════════════════════════════════════════\n');
     return examData;
   } catch (error: any) {
@@ -441,6 +448,7 @@ export function normalizeQuestionNumbers(exam: GeneratedExam): GeneratedExam {
     return {
       ...exam,
       parts: normalizedParts,
+      questions: exam.questions || [], // Preserve root-level questions array (usually empty)
       questionCount: globalQuestionNumber - 1, // Update total question count
     };
   } catch (error) {
