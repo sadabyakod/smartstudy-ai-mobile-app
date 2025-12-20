@@ -544,6 +544,9 @@ function SubjectiveQuestionResultCard({
 // Step Analysis Card Component
 function StepAnalysisCard({ step, stepIndex }: { step: StepAnalysisItem; stepIndex: number }) {
   const isCorrect = step.isCorrect && step.marksAwarded > 0;
+  // Each step is worth 1 mark
+  const stepMarksAwarded = isCorrect ? 1 : 0;
+  const stepMaxMarks = 1;
   
   return (
     <View style={[styles.stepCard, isCorrect ? styles.stepCardCorrect : styles.stepCardWrong]}>
@@ -555,11 +558,11 @@ function StepAnalysisCard({ step, stepIndex }: { step: StepAnalysisItem; stepInd
             color={isCorrect ? '#22c55e' : '#ef4444'} 
           />
           <Text style={styles.stepDescription}>
-            Step {step.step}: {step.description}
+            Step {stepIndex + 1}: {step.description}
           </Text>
         </View>
         <Text style={[styles.stepMarks, { color: isCorrect ? '#22c55e' : '#ef4444' }]}>
-          {step.marksAwarded}/{step.maxMarksForStep}
+          {stepMarksAwarded}/{stepMaxMarks}
         </Text>
       </View>
       {step.feedback && step.feedback !== step.description && (
