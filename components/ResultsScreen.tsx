@@ -515,15 +515,7 @@ function SubjectiveQuestionResultCard({
             </View>
           )}
 
-          {/* Model Answer - show only if not full marks */}
-          {result.expectedAnswer && !isFullMarks && (
-            <View style={styles.detailSection}>
-              <Text style={styles.detailLabel}>✅ Model Answer:</Text>
-              <View style={styles.modelAnswerBox}>
-                <Text style={styles.expectedAnswerText}>{result.expectedAnswer}</Text>
-              </View>
-            </View>
-          )}
+          {/* Model Answer removed - already included in AI Evaluation feedback */}
 
           {/* Improvement Suggestions */}
           {(result as any).improvementSuggestions && (
