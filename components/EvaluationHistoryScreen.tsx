@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -121,6 +122,60 @@ export default function EvaluationHistoryScreen({ onBack }: Props) {
     );
   };
 
+  const handleShareEvaluation = async (item: EvaluationHistoryItem) => {
+    try {
+      const fullResult = item.fullResult;
+      
+      let shareText = `📊 *${item.examTitle} - Evaluation Report*\n\n`;
+      shareText += `📚 Subject: ${item.subject}\n`;
+      shareText += `📅 Date: ${formatDate(item.evaluatedAt)}\n\n`;
+      shareText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      shareText += `🎯 *OVERALL SCORE*\n`;
+      shareText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      shareText += `📝 Total Score: ${item.grandScore}/${item.grandTotalMarks}\n`;
+      shareText += `📈 Percentage: ${item.percentage?.toFixed(1)}%\n`;
+      shareText += `🏆 Grade: ${item.grade}\n`;
+      shareText += `${item.passed ? '✅ Status: PASSED' : '❌ Status: FAILED'}\n\n`;
+
+      // MCQ Results
+      if (fullResult?.mcqResults && fullResult.mcqResults.length > 0) {
+        const mcqCorrect = fullResult.mcqResults.filter((m: any) => m.isCorrect).length;
+        shareText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        shareText += `📋 *MCQ SECTION*\n`;
+        shareText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        shareText += `Score: ${fullResult.mcqScore || mcqCorrect}/${fullResult.mcqTotalMarks || fullResult.mcqResults.length}\n\n`;
+      }
+
+      // Subjective Results
+      if (fullResult?.subjectiveResults && fullResult.subjectiveResults.length > 0) {
+        shareText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        shareText += `✍️ *SUBJECTIVE SECTION*\n`;
+        shareText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        shareText += `Score: ${fullResult.subjectiveScore}/${fullResult.subjectiveTotalMarks}\n\n`;
+        
+        fullResult.subjectiveResults.forEach((q: any, idx: number) => {
+          const qNum = q.questionNumber || idx + 1;
+          const earned = q.earnedMarks ?? q.score ?? 0;
+          const max = q.maxMarks || 1;
+          shareText += `📌 Q${qNum}: ${earned}/${max} marks\n`;
+          if (q.questionText) {
+            shareText += `   ${q.questionText.substring(0, 50)}${q.questionText.length > 50 ? '...' : ''}\n`;
+          }
+        });
+      }
+
+      shareText += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      shareText += `📱 Evaluated by Smart Study AI`;
+
+      await Share.share({
+        message: shareText,
+        title: `${item.examTitle} - Evaluation Report`,
+      });
+    } catch (error) {
+      console.error('Error sharing evaluation:', error);
+    }
+  };
+
   const getGradeColor = (grade: string): string => {
     switch (grade?.toUpperCase()) {
       case 'A+':
@@ -204,8 +259,21 @@ export default function EvaluationHistoryScreen({ onBack }: Props) {
         </View>
 
         <View style={styles.cardFooter}>
-          <Ionicons name="time-outline" size={14} color={COLORS.textTertiary} />
-          <Text style={styles.dateText}>{formatDate(item.evaluatedAt)}</Text>
+          <View style={styles.dateContainer}>
+            <Ionicons name="time-outline" size={14} color={COLORS.textTertiary} />
+            <Text style={styles.dateText}>{formatDate(item.evaluatedAt)}</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.shareButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleShareEvaluation(item);
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="share-social-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.shareButtonText}>Share</Text>
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -409,15 +477,34 @@ const styles = StyleSheet.create({
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   dateText: {
     fontSize: 12,
     color: COLORS.textTertiary,
     marginLeft: 6,
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  shareButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
   emptyContainer: {
     flex: 1,
