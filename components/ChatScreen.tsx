@@ -573,7 +573,7 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <LinearGradient colors={["#E0EAFC", "#CFDEF3"]} style={styles.gradient}>
+      <LinearGradient colors={["#f8fafc", "#eef2ff", "#e0e7ff"]} style={styles.gradient}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -597,39 +597,46 @@ export default function ChatScreen() {
             ]}
           >
             <LinearGradient
-              colors={["#007bff", "#00b4d8"]}
+              colors={["#667eea", "#764ba2"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.header}
             >
-              {/* ✅ Clickable Logo */}
+              {/* Back Button */}
               <TouchableOpacity
-                onPress={() =>
-                  Linking.openURL("https://neurozicsoft.vercel.app/")
-                }
-                activeOpacity={0.8}
-              >
-                <Image
-                  source={require("../assets/company-logo.jpeg")}
-                  style={styles.logo}
-                />
-              </TouchableOpacity>
-
-              <View style={styles.headerTextContainer}>
-                <Text style={styles.headerTitle}>Study Dashboard</Text>
-                <Text style={styles.headerSubtitle}>
-                  Learning Support
-                </Text>
-              </View>
-
-              {/* Back to Dashboard Button */}
-              <TouchableOpacity
-                style={styles.examButton}
+                style={styles.backButton}
                 onPress={() => navigate("home")}
                 activeOpacity={0.8}
               >
-                <Ionicons name="home" size={20} color="#fff" />
-                <Text style={styles.examButtonText}>Dashboard</Text>
+                <Ionicons name="arrow-back" size={22} color="#fff" />
+              </TouchableOpacity>
+
+              {/* AI Avatar */}
+              <View style={styles.aiAvatarContainer}>
+                <LinearGradient
+                  colors={["#fff", "#f0f4ff"]}
+                  style={styles.aiAvatar}
+                >
+                  <Ionicons name="sparkles" size={22} color="#667eea" />
+                </LinearGradient>
+                <View style={styles.onlineIndicator} />
+              </View>
+
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.headerTitle}>AI Study Assistant</Text>
+                <View style={styles.statusContainer}>
+                  <View style={styles.statusDot} />
+                  <Text style={styles.headerSubtitle}>Online • Ready to help</Text>
+                </View>
+              </View>
+
+              {/* Menu Button */}
+              <TouchableOpacity
+                style={styles.menuButton}
+                onPress={() => navigate("home")}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="home-outline" size={22} color="#fff" />
               </TouchableOpacity>
             </LinearGradient>
           </Animated.View>
@@ -667,7 +674,7 @@ export default function ChatScreen() {
                 {item.sender === "user" ? (
                   <View style={styles.userMessageWrapper}>
                     <LinearGradient
-                      colors={["#0078FE", "#5AA9FF"]}
+                      colors={["#667eea", "#764ba2"]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.userBubble}
@@ -677,33 +684,41 @@ export default function ChatScreen() {
                         activeOpacity={0.8}
                       >
                         <Text style={styles.userText}>{item.text}</Text>
-                        <Text style={[styles.timeText, styles.userTimeText]}>
-                          {item.time}
-                        </Text>
+                        <View style={styles.messageFooter}>
+                          <Text style={[styles.timeText, styles.userTimeText]}>
+                            {item.time}
+                          </Text>
+                          <Ionicons name="checkmark-done" size={14} color="rgba(255,255,255,0.7)" />
+                        </View>
                       </TouchableOpacity>
                     </LinearGradient>
                     <View style={styles.actionBar}>
                       <TouchableOpacity onPress={() => handleCopy(item.text)} style={styles.actionButton}>
-                        <Ionicons name="copy-outline" size={16} color="#666" />
+                        <Ionicons name="copy-outline" size={15} color="#9CA3AF" />
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleShare(item.text, item.id)} style={styles.actionButton}>
-                        <Ionicons name="share-outline" size={16} color="#666" />
+                        <Ionicons name="share-social-outline" size={15} color="#9CA3AF" />
                       </TouchableOpacity>
                     </View>
                   </View>
                 ) : (
                   <View style={styles.botMessageWrapper}>
-                    <View style={styles.botBubble}>
-                      <Text style={styles.botText}>{item.text}</Text>
-                      <Text style={styles.timeText}>{item.time}</Text>
+                    <View style={styles.botAvatarSmall}>
+                      <Ionicons name="sparkles" size={14} color="#667eea" />
                     </View>
-                    <View style={styles.actionBar}>
-                      <TouchableOpacity onPress={() => handleCopy(item.text)} style={styles.actionButton}>
-                        <Ionicons name="copy-outline" size={16} color="#666" />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleShare(item.text, item.id)} style={styles.actionButton}>
-                        <Ionicons name="share-outline" size={16} color="#666" />
-                      </TouchableOpacity>
+                    <View style={styles.botBubbleContainer}>
+                      <View style={styles.botBubble}>
+                        <Text style={styles.botText}>{item.text}</Text>
+                        <Text style={styles.timeText}>{item.time}</Text>
+                      </View>
+                      <View style={styles.actionBar}>
+                        <TouchableOpacity onPress={() => handleCopy(item.text)} style={styles.actionButton}>
+                          <Ionicons name="copy-outline" size={15} color="#9CA3AF" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleShare(item.text, item.id)} style={styles.actionButton}>
+                          <Ionicons name="share-social-outline" size={15} color="#9CA3AF" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
                 )}
@@ -711,18 +726,23 @@ export default function ChatScreen() {
             ))}
 
             {isTyping && (
-              <View style={styles.typingIndicator}>
-                <Ionicons name="book" size={32} color="#2563EB" style={{ marginRight: 8 }} />
-                <View style={styles.dotContainer}>
-                  <Animated.View
-                    style={[styles.dot, { transform: [{ translateY: dot1 }] }]}
-                  />
-                  <Animated.View
-                    style={[styles.dot, { transform: [{ translateY: dot2 }] }]}
-                  />
-                  <Animated.View
-                    style={[styles.dot, { transform: [{ translateY: dot3 }] }]}
-                  />
+              <View style={styles.typingContainer}>
+                <View style={styles.botAvatarSmall}>
+                  <Ionicons name="sparkles" size={14} color="#667eea" />
+                </View>
+                <View style={styles.typingBubble}>
+                  <View style={styles.dotContainer}>
+                    <Animated.View
+                      style={[styles.dot, { transform: [{ translateY: dot1 }] }]}
+                    />
+                    <Animated.View
+                      style={[styles.dot, { transform: [{ translateY: dot2 }] }]}
+                    />
+                    <Animated.View
+                      style={[styles.dot, { transform: [{ translateY: dot3 }] }]}
+                    />
+                  </View>
+                  <Text style={styles.typingText}>AI is thinking...</Text>
                 </View>
               </View>
             )}
@@ -790,28 +810,45 @@ export default function ChatScreen() {
           </Modal>
 
           {/* INPUT */}
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={[styles.input, { height: Math.max(44, inputHeight) }]}
-              placeholder="Type your question here..."
-              value={input}
-              onChangeText={setInput}
-              onSubmitEditing={() => handleSend(input)}
-              placeholderTextColor="#9CA3AF"
-              multiline
-              onContentSizeChange={(e) =>
-                setInputHeight(e.nativeEvent.contentSize.height)
-              }
-              onFocus={scrollToBottom}
-            />
-
-            <TouchableOpacity
-              style={[styles.sendBtn, !input.trim() && { opacity: 0.4 }]}
-              onPress={() => handleSend(input)}
-              disabled={!input.trim()}
-            >
-              <Ionicons name="paper-plane" size={20} color="#fff" />
-            </TouchableOpacity>
+          <View style={styles.inputContainer}>
+            <View style={styles.inputWrapper}>
+              <View style={styles.inputIconLeft}>
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#9CA3AF" />
+              </View>
+              <TextInput
+                style={[styles.input, { height: Math.max(44, inputHeight) }]}
+                placeholder="Ask me anything about your studies..."
+                value={input}
+                onChangeText={setInput}
+                onSubmitEditing={() => handleSend(input)}
+                placeholderTextColor="#9CA3AF"
+                multiline
+                onContentSizeChange={(e) =>
+                  setInputHeight(e.nativeEvent.contentSize.height)
+                }
+                onFocus={scrollToBottom}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn,
+                  input.trim() ? styles.sendBtnActive : styles.sendBtnInactive
+                ]}
+                onPress={() => handleSend(input)}
+                disabled={!input.trim()}
+              >
+                <LinearGradient
+                  colors={input.trim() ? ["#667eea", "#764ba2"] : ["#E5E7EB", "#E5E7EB"]}
+                  style={styles.sendBtnGradient}
+                >
+                  <Ionicons 
+                    name="send" 
+                    size={18} 
+                    color={input.trim() ? "#fff" : "#9CA3AF"} 
+                  />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.poweredBy}>Powered by AI • SmartStudy</Text>
           </View>
 
           <View style={{ height: Platform.OS === "ios" ? 10 : 25 }} />
@@ -859,46 +896,82 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    height: 65,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    height: 70,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     paddingHorizontal: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowColor: "#667eea",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
   },
-  logo: { width: 42, height: 42, borderRadius: 12, marginRight: 10 },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  aiAvatarContainer: {
+    position: "relative",
+    marginLeft: 12,
+  },
+  aiAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.5)",
+  },
+  onlineIndicator: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#22C55E",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
   headerTextContainer: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: -10,
+    marginLeft: 12,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "700",
     color: "#fff",
-    textAlign: "center",
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: "#DCEAFE",
-    textAlign: "center",
     letterSpacing: 0.3,
   },
-  examButton: {
+  statusContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    marginTop: 2,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#22C55E",
+    marginRight: 6,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.85)",
+    letterSpacing: 0.2,
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   shareConversationButton: {
     backgroundColor: "rgba(255,255,255,0.2)",
@@ -944,57 +1017,108 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginRight: 6,
   },
-  userMessageWrapper: { alignItems: "flex-end", marginVertical: 8 },
+  userMessageWrapper: { 
+    alignItems: "flex-end", 
+    marginVertical: 6,
+    paddingLeft: 50,
+  },
   botMessageWrapper: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    marginVertical: 8,
+    alignItems: "flex-start",
+    marginVertical: 6,
+    paddingRight: 50,
+  },
+  botAvatarSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(102, 126, 234, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 8,
+    marginTop: 4,
+  },
+  botBubbleContainer: {
+    flex: 1,
   },
   userBubble: {
-    padding: 12,
-    borderRadius: 24,
-    maxWidth: "100%",
-    borderTopRightRadius: 16,
-    backgroundColor: "#2563EB",
-    shadowColor: "#000",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderTopRightRadius: 6,
+    shadowColor: "#667eea",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 4,
   },
   botBubble: {
-    backgroundColor: "#F1F5F9",
-    borderWidth: 0.8,
-    borderColor: "#E5E7EB",
-    padding: 12,
-    borderRadius: 24,
-    borderTopLeftRadius: 16,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderTopLeftRadius: 6,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
-    maxWidth: "100%",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)",
   },
-  userText: { color: "#fff", fontSize: 16 },
-  botText: { color: "#333", fontSize: 16 },
+  userText: { 
+    color: "#fff", 
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  botText: { 
+    color: "#1F2937", 
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  messageFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    marginTop: 6,
+    gap: 4,
+  },
   timeText: {
-    fontSize: 10,
-    color: "#888",
-    marginTop: 4,
+    fontSize: 11,
+    color: "#9CA3AF",
     alignSelf: "flex-end",
   },
   userTimeText: {
-    color: "#E0ECFF",
+    color: "rgba(255,255,255,0.7)",
   },
-  typingIndicator: {
+  typingContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginVertical: 6,
+    paddingRight: 50,
+  },
+  typingBubble: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: 10,
-    marginTop: 5,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderTopLeftRadius: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  dotContainer: { flexDirection: "row", marginLeft: 6, gap: 4 },
-  dot: { width: 6, height: 6, backgroundColor: "#888", borderRadius: 3 },
+  typingText: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    marginLeft: 8,
+    fontStyle: "italic",
+  },
+  dotContainer: { flexDirection: "row", gap: 4 },
+  dot: { width: 8, height: 8, backgroundColor: "#667eea", borderRadius: 4 },
   followUpContainer: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1003,47 +1127,72 @@ const styles = StyleSheet.create({
   followUpChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
+    backgroundColor: "rgba(102, 126, 234, 0.1)",
     borderWidth: 1,
-    borderColor: "#BFDBFE",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 8,
+    borderColor: "rgba(102, 126, 234, 0.3)",
+    borderRadius: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
     alignSelf: "flex-start",
   },
   followUpText: {
-    color: "#2563EB",
+    color: "#667eea",
     fontSize: 14,
     fontWeight: "600",
+    flex: 1,
+  },
+  inputContainer: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "flex-end",
     backgroundColor: "#FFFFFF",
-    marginHorizontal: 10,
-    marginBottom: 10,
-    borderRadius: 30,
+    borderRadius: 28,
     paddingVertical: 6,
-    paddingHorizontal: 10,
-    elevation: 5,
+    paddingHorizontal: 6,
+    shadowColor: "#667eea",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: "rgba(102, 126, 234, 0.15)",
+  },
+  inputIconLeft: {
+    padding: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
   input: {
     flex: 1,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#C7D2FE",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "#F9FAFB",
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     fontSize: 16,
-    color: "#333",
+    color: "#1F2937",
+    maxHeight: 120,
   },
   sendBtn: {
-    backgroundColor: "#2563EB",
-    borderRadius: 20,
-    padding: 10,
     marginLeft: 4,
+    marginBottom: 2,
+  },
+  sendBtnActive: {},
+  sendBtnInactive: {},
+  sendBtnGradient: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  poweredBy: {
+    textAlign: "center",
+    fontSize: 11,
+    color: "#9CA3AF",
+    marginTop: 8,
+    letterSpacing: 0.3,
   },
   actionBar: {
     flexDirection: "row",
