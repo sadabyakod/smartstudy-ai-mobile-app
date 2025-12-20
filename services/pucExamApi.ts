@@ -400,6 +400,10 @@ export async function generatePUCExam(
     console.log('Exam data validated successfully!');
     console.log('Exam ID:', examData.examId);
     console.log('Parts:', examData.parts.length);
+    
+    // Normalize question numbers to be continuous across all parts
+    examData = normalizeQuestionNumbers(examData);
+    console.log('🔢 Question numbers normalized to be continuous across all sections');
     console.log('═══════════════════════════════════════════════════════════\n');
     return examData;
   } catch (error: any) {
@@ -415,6 +419,29 @@ export async function generatePUCExam(
     
     throw new ApiError(getUserFriendlyErrorMessage(error));
   }
+}
+
+/**
+ * Normalize question numbers to be continuous across all parts
+ * Instead of resetting per section (Part A: 1-5, Part B: 1-3, Part C: 1-2),
+ * questions will be numbered continuously (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, ...)
+ */
+export function normalizeQuestionNumbers(exam: GeneratedExam): GeneratedExam {
+  let globalQuestionNumber = 1;
+  
+  const normalizedParts = exam.parts.map(part => ({
+    ...part,
+    questions: part.questions.map(question => ({
+      ...question,
+      questionNumber: globalQuestionNumber++,
+    })),
+  }));
+  
+  return {
+    ...exam,
+    parts: normalizedParts,
+    questionCount: globalQuestionNumber - 1, // Update total question count
+  };
 }
 
 // Helper to check if a question is MCQ
