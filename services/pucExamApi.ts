@@ -232,6 +232,11 @@ export const PUC_SUBJECTS = [
 export const PUC_GRADES = [
   "Class 12",
   "Class 11",
+  "Class 10",
+  "Class 9",
+  "Class 8",
+  "Class 7",
+  "Class 6",
 ];
 
 // Custom error class for API errors
