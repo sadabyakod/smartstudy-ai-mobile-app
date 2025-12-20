@@ -1451,7 +1451,6 @@ export default function PUCExamScreen() {
     console.log('📄 [QUESTION PAPER] Exam ID:', generatedExam.examId);
     const subjectiveParts = getSubjectiveParts();
     console.log('📄 [QUESTION PAPER] Subjective parts count:', subjectiveParts.length);
-    let questionNumber = 0;
 
     return (
       <SafeAreaView style={styles.container}>
@@ -1503,15 +1502,13 @@ export default function PUCExamScreen() {
                   <Text style={styles.boardPartInstructions}>{part.partDescription}</Text>
                 )}
 
-                {/* Questions */}
-                {part.questions?.map((question, qIndex) => {
-                  questionNumber++;
-                  return (
+                {/* Questions - use questionNumber from API for continuous numbering */}
+                {part.questions?.map((question, qIndex) => (
                     <View key={question.questionId} style={styles.boardQuestionCard}>
-                      {/* Question Number & Marks */}
+                      {/* Question Number & Marks - use API's questionNumber for continuous numbering */}
                       <View style={styles.boardQuestionHeader}>
                         <View style={styles.boardQuestionNumberBadge}>
-                          <Text style={styles.boardQuestionNumber}>Q{questionNumber}</Text>
+                          <Text style={styles.boardQuestionNumber}>Q{question.questionNumber}</Text>
                         </View>
                         <View style={styles.boardMarksBadge}>
                           <Text style={styles.boardMarksText}>{part.marksPerQuestion}M</Text>
@@ -1546,8 +1543,7 @@ export default function PUCExamScreen() {
                         </View>
                       )}
                     </View>
-                  );
-                })}
+                ))}
               </View>
             ))}
 
