@@ -134,7 +134,7 @@ const STATUS_CONFIG: Record<string, { icon: string; color: string; message: stri
 // ============================================
 
 export default function LearningHub() {
-  const { navigate, pendingEvaluation, setPendingEvaluation, setCompletedEvaluation } = useContext(NavigationContext);
+  const { navigate, pendingEvaluation, setPendingEvaluation, setCompletedEvaluation, setResultsScreenData } = useContext(NavigationContext);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [evaluationStatus, setEvaluationStatus] = useState<SubmissionStatusResponse | null>(null);
 
@@ -174,9 +174,14 @@ export default function LearningHub() {
               writtenSubmissionId: pendingEvaluation.writtenSubmissionId,
               result: status.result
             });
+            // Navigate directly to results screen
+            setResultsScreenData({
+              examResult: status.result,
+              examTitle: `${pendingEvaluation.subject} - Results`,
+            });
             setPendingEvaluation(null);
             setEvaluationStatus(null);
-            navigate("puc-exam");
+            navigate("results");
           } else {
             // Results not ready yet - show friendly message
             Alert.alert(
@@ -187,14 +192,18 @@ export default function LearningHub() {
           }
         } else {
           console.log('✅ [LearningHub] Full results received! Navigating to results...');
-          // Set completed evaluation data and navigate to results screen
+          // Set completed evaluation data and navigate directly to results screen
           setCompletedEvaluation({
             writtenSubmissionId: pendingEvaluation.writtenSubmissionId,
             result: fullResults
           });
+          setResultsScreenData({
+            examResult: fullResults as any,
+            examTitle: `${pendingEvaluation.subject} - Results`,
+          });
           setPendingEvaluation(null);
           setEvaluationStatus(null);
-          navigate("puc-exam");
+          navigate("results");
         }
       } else if (isEvaluationFailed(status.status)) {
         console.log('❌ [LearningHub] Evaluation failed! Status:', status.status);

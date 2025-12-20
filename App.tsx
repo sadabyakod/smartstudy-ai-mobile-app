@@ -7,12 +7,14 @@ import ModelPaperScreen from "./components/ModelPaperScreen";
 import PUCExamScreen from "./components/PUCExamScreen";
 import SyllabusScreen from "./components/SyllabusScreen";
 import DownloadModelPapersScreen from "./components/DownloadModelPapersScreen";
-import { NavigationContext, Screen, PendingEvaluation, CompletedEvaluationResult } from "./navigation/NavigationContext";
+import ResultsScreen from "./components/ResultsScreen";
+import { NavigationContext, Screen, PendingEvaluation, CompletedEvaluationResult, ResultsScreenData } from "./navigation/NavigationContext";
 
 export default function App() {
   const [stack, setStack] = useState<Screen[]>(["home"]);
   const [pendingEvaluation, setPendingEvaluation] = useState<PendingEvaluation | null>(null);
   const [completedEvaluation, setCompletedEvaluation] = useState<CompletedEvaluationResult | null>(null);
+  const [resultsScreenData, setResultsScreenData] = useState<ResultsScreenData | null>(null);
 
   const currentScreen = stack[stack.length - 1];
   const canGoBack = stack.length > 1;
@@ -39,6 +41,19 @@ export default function App() {
         return <SyllabusScreen />;
       case "download-papers":
         return <DownloadModelPapersScreen />;
+      case "results":
+        return (
+          <ResultsScreen 
+            examResult={resultsScreenData?.examResult}
+            examId={resultsScreenData?.examId}
+            studentId={resultsScreenData?.studentId}
+            examTitle={resultsScreenData?.examTitle}
+            onBack={() => {
+              setResultsScreenData(null);
+              goBack();
+            }}
+          />
+        );
       default:
         return <LearningHub />;
     }
@@ -54,7 +69,9 @@ export default function App() {
         pendingEvaluation,
         setPendingEvaluation,
         completedEvaluation,
-        setCompletedEvaluation
+        setCompletedEvaluation,
+        resultsScreenData,
+        setResultsScreenData
       }}>
         <View style={styles.container}>
           <View style={styles.content}>

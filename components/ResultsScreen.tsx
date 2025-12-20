@@ -7,42 +7,94 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Alert,
+  Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getExamResults, ExamResult, SubjectiveResult, McqQuestionResult } from '../services/pucExamApi';
+import { Ionicons } from '@expo/vector-icons';
+import { getExamResults, ExamResult, SubjectiveResult, McqQuestionResult as McqResultType, StepAnalysisItem } from '../services/pucExamApi';
 
 interface ResultsScreenProps {
-  examId: string;
-  studentId: string;
+  // Can receive either examResult directly OR examId/studentId to fetch
+  examResult?: ExamResult | null;
+  examId?: string;
+  studentId?: string;
+  examTitle?: string;
   onBack: () => void;
 }
 
 export default function ResultsScreen({ 
+  examResult: initialResult,
   examId, 
-  studentId, 
+  studentId,
+  examTitle,
   onBack
 }: ResultsScreenProps) {
-  const [results, setResults] = useState<ExamResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [results, setResults] = useState<ExamResult | null>(initialResult || null);
+  const [loading, setLoading] = useState(!initialResult);
   const [error, setError] = useState<string | null>(null);
+  const [showMcqDetails, setShowMcqDetails] = useState(false);
+  const [showSubjectiveDetails, setShowSubjectiveDetails] = useState(true);
 
   useEffect(() => {
-    loadResults();
-  }, []);
+    // If we already have results, don't fetch
+    if (initialResult) {
+      console.log('📊 [ResultsScreen] Using provided examResult');
+      setResults(initialResult);
+      setLoading(false);
+      return;
+    }
+    
+    // Only fetch if we have examId and studentId
+    if (examId && studentId) {
+      loadResults();
+    } else {
+      setLoading(false);
+      setError('No exam results available');
+    }
+  }, [initialResult, examId, studentId]);
 
   const loadResults = async () => {
+    if (!examId || !studentId) {
+      setError('Missing exam or student ID');
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
       setError(null);
+      console.log('📊 [ResultsScreen] Fetching results for exam:', examId);
       
       const data = await getExamResults(examId, studentId);
       setResults(data);
     } catch (err: any) {
       const errorMsg = err.userMessage || err.message || 'Failed to load results';
       setError(errorMsg);
-      Alert.alert('Error', errorMsg);
+      console.error('❌ [ResultsScreen] Error loading results:', errorMsg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!results) return;
+    
+    try {
+      const shareText = `📊 My Exam Results\n\n` +
+        `📚 ${results.examTitle || examTitle || 'Exam'}\n` +
+        `🎯 Score: ${results.grandScore}/${results.grandTotalMarks}\n` +
+        `📈 Percentage: ${results.percentage?.toFixed(1) || 0}%\n` +
+        `🏆 Grade: ${results.grade}\n` +
+        `${results.passed ? '✅ Passed!' : '❌ Need more practice'}\n\n` +
+        `📝 MCQ: ${results.mcqScore}/${results.mcqTotalMarks}\n` +
+        `✍️ Subjective: ${results.subjectiveScore}/${results.subjectiveTotalMarks}`;
+      
+      await Share.share({
+        message: shareText,
+        title: 'My Exam Results',
+      });
+    } catch (error) {
+      console.error('Error sharing results:', error);
     }
   };
 
@@ -58,9 +110,15 @@ export default function ResultsScreen({
   if (error || !results) {
     return (
       <View style={styles.centerContainer}>
+        <Ionicons name="alert-circle" size={64} color="#ef4444" />
         <Text style={styles.errorText}>{error || 'No results found'}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadResults}>
-          <Text style={styles.retryButtonText}>Retry</Text>
+        {examId && studentId && (
+          <TouchableOpacity style={styles.retryButton} onPress={loadResults}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={[styles.retryButton, { backgroundColor: '#64748b', marginTop: 12 }]} onPress={onBack}>
+          <Text style={styles.retryButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -68,93 +126,177 @@ export default function ResultsScreen({
 
   const getGradeColor = (grade: string) => {
     switch (grade) {
-      case 'A+':
-      case 'A':
-        return '#22c55e';
-      case 'B+':
-      case 'B':
-        return '#3b82f6';
-      case 'C':
-        return '#f97316';
-      case 'D':
-        return '#ea580c';
-      default:
-        return '#ef4444';
+      case 'A+': return '#15803d';
+      case 'A': return '#22c55e';
+      case 'B+': return '#3b82f6';
+      case 'B': return '#60a5fa';
+      case 'C+': return '#f97316';
+      case 'C': return '#fb923c';
+      case 'D': return '#ea580c';
+      default: return '#ef4444';
+    }
+  };
+
+  const getGradeEmoji = (grade: string) => {
+    switch (grade) {
+      case 'A+': return '🏆';
+      case 'A': return '🌟';
+      case 'B+': return '👍';
+      case 'B': return '✨';
+      case 'C+': return '📚';
+      case 'C': return '💪';
+      case 'D': return '🎯';
+      default: return '📖';
     }
   };
 
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Header with Back and Share */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerButton} onPress={onBack}>
+            <Ionicons name="arrow-back" size={24} color="#4F46E5" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Exam Results</Text>
+          <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
+            <Ionicons name="share-outline" size={24} color="#4F46E5" />
+          </TouchableOpacity>
+        </View>
+
         {/* Overall Score Card */}
-        <LinearGradient colors={['#6366f1', '#8b5cf6']} style={styles.scoreCard}>
-          <Text style={styles.scoreTitle}>Your Score</Text>
-          <View style={styles.scoreRow}>
-            <Text style={styles.scoreValue}>
-              {(results.mcqScore || 0) + (results.subjectiveScore || 0)}
-            </Text>
-            <Text style={styles.scoreMax}>
-              / {(results.mcqTotalMarks || 0) + (results.subjectiveTotalMarks || 0)}
-            </Text>
+        <LinearGradient 
+          colors={results.passed ? ['#22c55e', '#16a34a'] : ['#f97316', '#ea580c']} 
+          style={styles.scoreCard}
+        >
+          <Text style={styles.examTitleText}>
+            {examTitle || results.examTitle || 'Exam Results'}
+          </Text>
+          
+          <View style={styles.scoreCircle}>
+            <Text style={styles.scoreValue}>{results.grandScore || 0}</Text>
+            <Text style={styles.scoreMax}>/ {results.grandTotalMarks || 0}</Text>
           </View>
-          <View style={styles.gradeContainer}>
-            <View style={[styles.gradeBadge, { backgroundColor: getGradeColor(results.grade || 'F') }]}>
+          
+          <View style={styles.gradeRow}>
+            <Text style={styles.gradeEmoji}>{getGradeEmoji(results.grade || 'F')}</Text>
+            <View style={styles.gradeBadge}>
               <Text style={styles.gradeText}>{results.grade || 'N/A'}</Text>
             </View>
             <Text style={styles.percentageText}>{(results.percentage || 0).toFixed(1)}%</Text>
           </View>
-          <Text style={styles.passedText}>
-            {results.passed ? '✓ Passed' : '✗ Not Passed'}
-          </Text>
+          
+          <View style={[styles.passedBadge, { backgroundColor: results.passed ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)' }]}>
+            <Ionicons name={results.passed ? "checkmark-circle" : "close-circle"} size={20} color="#fff" />
+            <Text style={styles.passedText}>
+              {results.passed ? 'Congratulations! You Passed!' : 'Keep Practicing!'}
+            </Text>
+          </View>
+          
+          {results.evaluatedAt && (
+            <Text style={styles.evaluatedAtText}>
+              Evaluated: {new Date(results.evaluatedAt).toLocaleString()}
+            </Text>
+          )}
         </LinearGradient>
 
-        {/* MCQ Section */}
-        {(results.mcqTotalMarks || 0) > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>MCQ Performance</Text>
-            <View style={styles.scoreBreakdown}>
-              <View style={styles.scoreItem}>
-                <Text style={styles.scoreLabel}>Score</Text>
-                <Text style={styles.scoreNumber}>
-                  {results.mcqScore || 0} / {results.mcqTotalMarks || 0}
-                </Text>
-              </View>
+        {/* Score Breakdown Card */}
+        <View style={styles.breakdownCard}>
+          <Text style={styles.sectionTitle}>📊 Score Breakdown</Text>
+          
+          <View style={styles.breakdownRow}>
+            <View style={styles.breakdownItem}>
+              <Ionicons name="checkbox" size={24} color="#4F46E5" />
+              <Text style={styles.breakdownLabel}>MCQ</Text>
+              <Text style={styles.breakdownScore}>{results.mcqScore || 0}/{results.mcqTotalMarks || 0}</Text>
             </View>
             
-            {/* Individual MCQ Results */}
-            {results.mcqResults && results.mcqResults.length > 0 && (
-              <View style={styles.mcqQuestionsContainer}>
+            <View style={styles.breakdownDivider} />
+            
+            <View style={styles.breakdownItem}>
+              <Ionicons name="create" size={24} color="#7C3AED" />
+              <Text style={styles.breakdownLabel}>Subjective</Text>
+              <Text style={styles.breakdownScore}>{results.subjectiveScore || 0}/{results.subjectiveTotalMarks || 0}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* MCQ Section */}
+        {results.mcqResults && results.mcqResults.length > 0 && (
+          <View style={styles.section}>
+            <TouchableOpacity 
+              style={styles.sectionHeader}
+              onPress={() => setShowMcqDetails(!showMcqDetails)}
+            >
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="checkbox-outline" size={24} color="#4F46E5" />
+                <Text style={styles.sectionTitle}>MCQ Results</Text>
+                <View style={styles.countBadge}>
+                  <Text style={styles.countText}>
+                    {results.mcqResults.filter(r => r.isCorrect).length}/{results.mcqResults.length}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name={showMcqDetails ? "chevron-up" : "chevron-down"} size={24} color="#64748b" />
+            </TouchableOpacity>
+            
+            {showMcqDetails && (
+              <View style={styles.questionsContainer}>
                 {results.mcqResults.map((mcqResult, index) => (
-                  <McqQuestionResult key={index} result={mcqResult} index={index} />
+                  <McqQuestionResult key={mcqResult.questionId || index} result={mcqResult} index={index} />
                 ))}
               </View>
             )}
           </View>
         )}
 
-        {/* Subjective Section - Detailed Feedback */}
+        {/* Subjective Section */}
         {results.subjectiveResults && results.subjectiveResults.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Subjective Answers - AI Evaluation</Text>
-            <View style={styles.scoreBreakdown}>
-              <View style={styles.scoreItem}>
-                <Text style={styles.scoreLabel}>Total Score</Text>
-                <Text style={styles.scoreNumber}>
-                  {results.subjectiveScore || 0} / {results.subjectiveTotalMarks || 0}
-                </Text>
+            <TouchableOpacity 
+              style={styles.sectionHeader}
+              onPress={() => setShowSubjectiveDetails(!showSubjectiveDetails)}
+            >
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="document-text-outline" size={24} color="#7C3AED" />
+                <Text style={styles.sectionTitle}>Subjective Evaluation</Text>
+                <View style={[styles.countBadge, { backgroundColor: '#7C3AED' }]}>
+                  <Text style={styles.countText}>{results.subjectiveResults.length} Q</Text>
+                </View>
               </View>
-            </View>
-
-            {/* Individual Question Results */}
-            {results.subjectiveResults.map((result, index) => (
-              <SubjectiveQuestionResult key={index} result={result} index={index} />
-            ))}
+              <Ionicons name={showSubjectiveDetails ? "chevron-up" : "chevron-down"} size={24} color="#64748b" />
+            </TouchableOpacity>
+            
+            {showSubjectiveDetails && (
+              <View style={styles.questionsContainer}>
+                {results.subjectiveResults.map((result, index) => (
+                  <SubjectiveQuestionResultCard key={result.questionId || index} result={result} index={index} />
+                ))}
+              </View>
+            )}
           </View>
         )}
 
-        {/* Overall Summary */}
+        {/* Performance Summary */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Performance Summary</Text>
+          <Text style={styles.summaryTitle}>📈 Performance Summary</Text>
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Total Questions</Text>
+            <Text style={styles.summaryValue}>
+              {(results.mcqResults?.length || 0) + (results.subjectiveResults?.length || 0)}
+            </Text>
+          </View>
+          
+          {results.mcqResults && results.mcqResults.length > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>MCQ Accuracy</Text>
+              <Text style={[styles.summaryValue, { color: '#4F46E5' }]}>
+                {((results.mcqResults.filter(r => r.isCorrect).length / results.mcqResults.length) * 100).toFixed(0)}%
+              </Text>
+            </View>
+          )}
+          
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>MCQ Score:</Text>
             <Text style={styles.summaryValue}>
@@ -168,15 +310,18 @@ export default function ResultsScreen({
             </Text>
           </View>
           <View style={[styles.summaryRow, styles.summaryRowTotal]}>
-            <Text style={styles.summaryLabelBold}>Grand Total:</Text>
-            <Text style={styles.summaryValueBold}>
-              {results.grandScore || 0} / {results.grandTotalMarks || 0}
+            <Text style={styles.summaryLabelBold}>Final Grade:</Text>
+            <Text style={[styles.summaryValueBold, { color: getGradeColor(results.grade || 'F') }]}>
+              {results.grade || 'N/A'} ({(results.percentage || 0).toFixed(1)}%)
             </Text>
           </View>
         </View>
 
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>Back to Home</Text>
+          <LinearGradient colors={['#4F46E5', '#7C3AED']} style={styles.buttonGradient}>
+            <Ionicons name="home" size={24} color="#fff" />
+            <Text style={styles.backButtonText}>Back to Home</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -188,51 +333,56 @@ function McqQuestionResult({
   result,
   index,
 }: {
-  result: McqQuestionResult;
+  result: McqResultType;
   index: number;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <View style={[styles.mcqCard, result.isCorrect && styles.mcqCardCorrect]}>
+    <View style={[styles.mcqCard, result.isCorrect ? styles.mcqCardCorrect : styles.mcqCardWrong]}>
       <TouchableOpacity
         style={styles.mcqHeader}
         onPress={() => setExpanded(!expanded)}
       >
         <View style={styles.mcqHeaderLeft}>
           <View style={[styles.mcqStatus, result.isCorrect ? styles.mcqCorrect : styles.mcqWrong]}>
-            <Text style={styles.mcqStatusText}>{result.isCorrect ? '✓' : '✗'}</Text>
+            <Ionicons name={result.isCorrect ? "checkmark" : "close"} size={16} color="#fff" />
           </View>
-          <Text style={styles.mcqQuestionNumber}>Q{result.questionNumber}</Text>
-          <Text style={styles.mcqMarks}>{result.marks} mark{result.marks > 1 ? 's' : ''}</Text>
+          <Text style={styles.mcqQuestionNumber}>Q{result.questionNumber || index + 1}</Text>
+          <Text style={[styles.mcqMarks, { color: result.isCorrect ? '#22c55e' : '#ef4444' }]}>
+            {result.marksAwarded} mark{result.marksAwarded > 1 ? 's' : ''}
+          </Text>
         </View>
-        <Text style={styles.expandIcon}>{expanded ? '▼' : '▶'}</Text>
+        <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={20} color="#64748b" />
       </TouchableOpacity>
 
       {expanded && (
         <View style={styles.mcqDetails}>
           {/* Question Text */}
-          <View style={styles.mcqDetailSection}>
-            <Text style={styles.mcqDetailLabel}>Question:</Text>
-            <Text style={styles.mcqQuestionText}>{result.questionText}</Text>
-          </View>
-
-          {/* Answer Summary - Only show correct answer when wrong */}
-          {!result.isCorrect && result.studentAnswer && (
+          {result.questionText && (
             <View style={styles.mcqDetailSection}>
-              <Text style={styles.mcqYourAnswerLabel}>
-                Your Answer: <Text style={styles.mcqYourAnswerText}>{result.studentAnswer}</Text>
-              </Text>
-              <Text style={styles.mcqCorrectAnswerLabel}>
-                Correct Answer: <Text style={styles.mcqCorrectAnswerText}>{result.correctAnswer}</Text>
-              </Text>
+              <Text style={styles.mcqDetailLabel}>Question:</Text>
+              <Text style={styles.mcqQuestionText}>{result.questionText}</Text>
             </View>
           )}
+
+          {/* Answer Summary */}
+          <View style={styles.answerRow}>
+            <View style={[styles.answerBlock, result.isCorrect ? styles.answerCorrect : styles.answerWrong]}>
+              <Text style={styles.answerLabel}>Your Answer</Text>
+              <Text style={styles.answerText}>{result.selectedOption}</Text>
+            </View>
+            {!result.isCorrect && (
+              <View style={[styles.answerBlock, styles.answerCorrect]}>
+                <Text style={styles.answerLabel}>Correct</Text>
+                <Text style={styles.answerText}>{result.correctAnswer}</Text>
+              </View>
+            )}
+          </View>
           {result.isCorrect && (
-            <View style={styles.mcqDetailSection}>
-              <Text style={styles.mcqCorrectAnswerLabel}>
-                ✓ Your answer is correct!
-              </Text>
+            <View style={styles.mcqCorrectBanner}>
+              <Ionicons name="checkmark-circle" size={18} color="#166534" />
+              <Text style={styles.mcqCorrectBannerText}>Your answer is correct!</Text>
             </View>
           )}
         </View>
@@ -242,17 +392,21 @@ function McqQuestionResult({
 }
 
 // Component for individual subjective question result
-function SubjectiveQuestionResult({
+function SubjectiveQuestionResultCard({
   result,
   index,
 }: {
   result: SubjectiveResult;
   index: number;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
-  const scorePercentage = (result.score / result.maxMarks) * 100;
-  const scoreColor = scorePercentage >= 80 ? '#22c55e' : scorePercentage >= 60 ? '#f97316' : '#ef4444';
+  // Use earnedMarks from new API format
+  const earnedMarks = result.earnedMarks ?? (result as any).score ?? 0;
+  const maxMarks = result.maxMarks || 1;
+  const scorePercentage = (earnedMarks / maxMarks) * 100;
+  const scoreColor = scorePercentage >= 80 ? '#22c55e' : scorePercentage >= 50 ? '#f97316' : '#ef4444';
+  const isFullMarks = scorePercentage >= 100;
 
   return (
     <View style={styles.questionCard}>
@@ -261,50 +415,94 @@ function SubjectiveQuestionResult({
         onPress={() => setExpanded(!expanded)}
       >
         <View style={styles.questionHeaderLeft}>
-          <Text style={styles.questionNumber}>Q{result.questionNumber}</Text>
+          <View style={[styles.questionBadge, { backgroundColor: scoreColor }]}>
+            <Text style={styles.questionBadgeText}>Q{result.questionNumber || index + 1}</Text>
+          </View>
           <View style={styles.questionScore}>
             <Text style={[styles.scoreEarned, { color: scoreColor }]}>
-              {result.score}
+              {earnedMarks}
             </Text>
-            <Text style={styles.scoreTotal}> / {result.maxMarks}</Text>
+            <Text style={styles.scoreTotal}> / {maxMarks}</Text>
           </View>
         </View>
-        <Text style={styles.expandIcon}>{expanded ? '▼' : '▶'}</Text>
+        <View style={styles.questionHeaderRight}>
+          {isFullMarks && <Text style={styles.fullMarksEmoji}>🎉</Text>}
+          <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={24} color="#64748b" />
+        </View>
       </TouchableOpacity>
 
       {expanded && (
         <View style={styles.questionDetails}>
+          {/* Status Banner */}
+          {isFullMarks ? (
+            <View style={[styles.statusBanner, styles.statusBannerSuccess]}>
+              <Ionicons name="checkmark-circle" size={18} color="#166534" />
+              <Text style={styles.statusBannerTextSuccess}>Perfect! Full marks awarded</Text>
+            </View>
+          ) : scorePercentage < 50 && (
+            <View style={[styles.statusBanner, styles.statusBannerWarning]}>
+              <Ionicons name="alert-circle" size={18} color="#92400e" />
+              <Text style={styles.statusBannerTextWarning}>Review the model answer below</Text>
+            </View>
+          )}
+
           {/* Question Text */}
+          {result.questionText && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>📌 Question:</Text>
+              <Text style={styles.detailText}>{result.questionText}</Text>
+            </View>
+          )}
+
+          {/* Student's Answer - Use studentAnswerEcho from new API */}
           <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>📝 Question:</Text>
-            <Text style={styles.detailText}>{result.questionText}</Text>
+            <Text style={styles.detailLabel}>✏️ Your Answer:</Text>
+            <View style={styles.studentAnswerBox}>
+              <Text style={styles.studentAnswerText}>
+                {result.studentAnswerEcho || (result as any).studentAnswer || '[No answer detected]'}
+              </Text>
+            </View>
           </View>
 
-          {/* Student's Answer */}
-          <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>✍️ Your Answer:</Text>
-            <Text style={styles.studentAnswerText}>
-              {result.studentAnswer || result.studentAnswerEcho || '[No answer provided]'}
-            </Text>
-          </View>
+          {/* Step Analysis - NEW! */}
+          {result.stepAnalysis && result.stepAnalysis.length > 0 && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>📊 Step-by-Step Marking:</Text>
+              <View style={styles.stepsContainer}>
+                {result.stepAnalysis.map((step, stepIndex) => (
+                  <StepAnalysisCard key={stepIndex} step={step} stepIndex={stepIndex} />
+                ))}
+              </View>
+            </View>
+          )}
 
-          {/* Model Answer */}
-          <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>✅ Model Answer:</Text>
-            <Text style={styles.expectedAnswerText}>{result.expectedAnswer}</Text>
-          </View>
+          {/* AI Feedback - Use overallFeedback from new API */}
+          {(result.overallFeedback || (result as any).feedback) && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>🤖 AI Evaluation:</Text>
+              <View style={styles.feedbackBox}>
+                <Text style={styles.feedbackText}>
+                  {result.overallFeedback || (result as any).feedback}
+                </Text>
+              </View>
+            </View>
+          )}
 
-          {/* AI Feedback */}
-          <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>🤖 AI Evaluation:</Text>
-            <Text style={styles.feedbackText}>{result.feedback}</Text>
-          </View>
+          {/* Model Answer - show only if not full marks */}
+          {result.expectedAnswer && !isFullMarks && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>✅ Model Answer:</Text>
+              <View style={styles.modelAnswerBox}>
+                <Text style={styles.expectedAnswerText}>{result.expectedAnswer}</Text>
+              </View>
+            </View>
+          )}
 
           {/* Improvement Suggestions */}
-          {result.improvementSuggestions && (
+          {(result as any).improvementSuggestions && (
             <View style={[styles.detailSection, styles.improvementSection]}>
               <Text style={styles.improvementLabel}>💡 Suggestions for Improvement:</Text>
-              <Text style={styles.improvementText}>{result.improvementSuggestions}</Text>
+              <Text style={styles.improvementText}>{(result as any).improvementSuggestions}</Text>
             </View>
           )}
         </View>
@@ -313,22 +511,52 @@ function SubjectiveQuestionResult({
   );
 }
 
+// Step Analysis Card Component
+function StepAnalysisCard({ step, stepIndex }: { step: StepAnalysisItem; stepIndex: number }) {
+  const isCorrect = step.isCorrect && step.marksAwarded > 0;
+  
+  return (
+    <View style={[styles.stepCard, isCorrect ? styles.stepCardCorrect : styles.stepCardWrong]}>
+      <View style={styles.stepHeader}>
+        <View style={styles.stepLeft}>
+          <Ionicons 
+            name={isCorrect ? "checkmark-circle" : "close-circle"} 
+            size={18} 
+            color={isCorrect ? '#22c55e' : '#ef4444'} 
+          />
+          <Text style={styles.stepDescription}>
+            Step {step.step}: {step.description}
+          </Text>
+        </View>
+        <Text style={[styles.stepMarks, { color: isCorrect ? '#22c55e' : '#ef4444' }]}>
+          {step.marksAwarded}/{step.maxMarksForStep}
+        </Text>
+      </View>
+      {step.feedback && step.feedback !== step.description && (
+        <Text style={styles.stepFeedback}>{step.feedback}</Text>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f1f5f9',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#f1f5f9',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
+    paddingBottom: 40,
   },
   loadingText: {
     marginTop: 16,
@@ -339,13 +567,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ef4444',
     textAlign: 'center',
+    marginTop: 16,
     marginBottom: 20,
   },
   retryButton: {
     backgroundColor: '#6366f1',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
   },
   retryButtonText: {
     color: '#fff',
@@ -353,115 +582,240 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // Header
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+
   // Score Card
   scoreCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  scoreTitle: {
-    fontSize: 18,
+  examTitleText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
-    opacity: 0.9,
-    marginBottom: 12,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 16,
+    textAlign: 'center',
   },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+  scoreCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 16,
   },
   scoreValue: {
-    fontSize: 48,
+    fontSize: 42,
     fontWeight: 'bold',
     color: '#fff',
   },
   scoreMax: {
-    fontSize: 24,
-    color: '#fff',
-    opacity: 0.8,
-    marginLeft: 8,
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: -4,
   },
-  gradeContainer: {
+  gradeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
+  gradeEmoji: {
+    fontSize: 28,
+    marginRight: 12,
+  },
   gradeBadge: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 12,
   },
   gradeText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
   },
   percentageText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: '#fff',
   },
+  passedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
   passedText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
-    opacity: 0.9,
+    marginLeft: 8,
+  },
+  evaluatedAtText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 8,
+  },
+
+  // Breakdown Card
+  breakdownCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginTop: 12,
+  },
+  breakdownItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  breakdownLabel: {
+    fontSize: 14,
+    color: '#64748b',
+    marginTop: 8,
+  },
+  breakdownScore: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginTop: 4,
+  },
+  breakdownDivider: {
+    width: 1,
+    height: 60,
+    backgroundColor: '#e2e8f0',
   },
 
   // Section
   section: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
     marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  scoreBreakdown: {
-    marginBottom: 16,
-  },
-  scoreItem: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    padding: 16,
+    backgroundColor: '#f8fafc',
   },
-  scoreLabel: {
-    fontSize: 14,
-    color: '#64748b',
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  scoreNumber: {
-    fontSize: 18,
-    fontWeight: '600',
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#1e293b',
+    marginLeft: 8,
+  },
+  countBadge: {
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  countText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  questionsContainer: {
+    padding: 12,
   },
 
   // Question Card
   questionCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fff',
     borderRadius: 12,
     marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   questionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
+    backgroundColor: '#f8fafc',
   },
   questionHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+  },
+  questionHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  questionBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  questionBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   questionNumber: {
     fontSize: 16,
@@ -481,17 +835,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
   },
-  expandIcon: {
-    fontSize: 12,
-    color: '#64748b',
+  fullMarksEmoji: {
+    fontSize: 24,
+    marginRight: 8,
   },
 
   // Question Details
   questionDetails: {
     padding: 16,
-    paddingTop: 0,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    paddingTop: 12,
   },
   detailSection: {
     marginBottom: 16,
@@ -509,29 +861,70 @@ const styles = StyleSheet.create({
     color: '#334155',
     lineHeight: 20,
   },
-  feedbackText: {
-    fontSize: 14,
-    color: '#0f172a',
-    lineHeight: 20,
-    fontWeight: '500',
-  },
-  expectedAnswerText: {
-    fontSize: 14,
-    color: '#22c55e',
-    lineHeight: 20,
-    backgroundColor: '#f0fdf4',
+  
+  // Status Banner
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 12,
     borderRadius: 8,
+    marginBottom: 16,
+  },
+  statusBannerSuccess: {
+    backgroundColor: '#dcfce7',
+  },
+  statusBannerWarning: {
+    backgroundColor: '#fef3c7',
+  },
+  statusBannerTextSuccess: {
+    color: '#166534',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  statusBannerTextWarning: {
+    color: '#92400e',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+
+  // Answer Boxes
+  studentAnswerBox: {
+    backgroundColor: '#f8fafc',
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   studentAnswerText: {
     fontSize: 14,
     color: '#334155',
     lineHeight: 20,
-    backgroundColor: '#fff',
-    padding: 12,
+  },
+  feedbackBox: {
+    backgroundColor: '#eff6ff',
+    padding: 14,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderLeftWidth: 4,
+    borderLeftColor: '#3b82f6',
+  },
+  feedbackText: {
+    fontSize: 14,
+    color: '#1e40af',
+    lineHeight: 20,
+  },
+  modelAnswerBox: {
+    backgroundColor: '#f0fdf4',
+    padding: 14,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#22c55e',
+  },
+  expectedAnswerText: {
+    fontSize: 14,
+    color: '#166534',
+    lineHeight: 20,
   },
   improvementSection: {
     backgroundColor: '#fef3c7',
@@ -551,14 +944,64 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
+  // Step Analysis
+  stepsContainer: {
+    gap: 8,
+  },
+  stepCard: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  stepCardCorrect: {
+    backgroundColor: '#f0fdf4',
+  },
+  stepCardWrong: {
+    backgroundColor: '#fef2f2',
+  },
+  stepHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  stepLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  stepDescription: {
+    fontSize: 13,
+    color: '#334155',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 18,
+  },
+  stepMarks: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  stepFeedback: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 6,
+    marginLeft: 26,
+    fontStyle: 'italic',
+  },
+
   // Summary Card
   summaryCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 20,
     borderWidth: 2,
-    borderColor: '#6366f1',
+    borderColor: '#4F46E5',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   summaryTitle: {
     fontSize: 18,
@@ -571,11 +1014,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   summaryRowTotal: {
     borderTopWidth: 2,
     borderTopColor: '#e2e8f0',
+    borderBottomWidth: 0,
     marginTop: 8,
     paddingTop: 16,
   },
@@ -596,16 +1042,20 @@ const styles = StyleSheet.create({
   summaryValueBold: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#6366f1',
   },
 
   // Back Button
   backButton: {
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
+    borderRadius: 14,
+    overflow: 'hidden',
     marginBottom: 20,
+  },
+  buttonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    gap: 10,
   },
   backButtonText: {
     color: '#fff',
@@ -614,27 +1064,27 @@ const styles = StyleSheet.create({
   },
 
   // MCQ Styles
-  mcqQuestionsContainer: {
-    marginTop: 12,
-  },
   mcqCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     overflow: 'hidden',
   },
   mcqCardCorrect: {
+    backgroundColor: '#f0fdf4',
     borderColor: '#22c55e',
-    borderWidth: 2,
+  },
+  mcqCardWrong: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#ef4444',
   },
   mcqHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#f8fafc',
+    padding: 14,
   },
   mcqHeaderLeft: {
     flexDirection: 'row',
@@ -654,92 +1104,75 @@ const styles = StyleSheet.create({
   mcqWrong: {
     backgroundColor: '#ef4444',
   },
-  mcqStatusText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   mcqQuestionNumber: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#1e293b',
   },
   mcqMarks: {
     fontSize: 14,
-    color: '#64748b',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   mcqDetails: {
-    padding: 16,
+    padding: 14,
+    paddingTop: 0,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
   mcqDetailSection: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   mcqDetailLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: '#64748b',
+    marginBottom: 6,
     textTransform: 'uppercase',
-    marginBottom: 8,
     letterSpacing: 0.5,
   },
   mcqQuestionText: {
     fontSize: 14,
     color: '#334155',
     lineHeight: 20,
-    fontWeight: '500',
   },
-  mcqOption: {
-    padding: 12,
-    backgroundColor: '#f8fafc',
+  mcqCorrectBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#dcfce7',
+    padding: 10,
     borderRadius: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    marginTop: 10,
   },
-  mcqOptionCorrect: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#22c55e',
-    borderWidth: 2,
-  },
-  mcqOptionWrong: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#ef4444',
-    borderWidth: 2,
-  },
-  mcqOptionText: {
+  mcqCorrectBannerText: {
+    color: '#166534',
     fontSize: 14,
-    color: '#334155',
-    lineHeight: 20,
-  },
-  mcqOptionTextCorrect: {
-    color: '#15803d',
     fontWeight: '600',
+    marginLeft: 8,
   },
-  mcqOptionTextWrong: {
-    color: '#dc2626',
+  answerRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  answerBlock: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+  },
+  answerCorrect: {
+    backgroundColor: '#dcfce7',
+  },
+  answerWrong: {
+    backgroundColor: '#fee2e2',
+  },
+  answerLabel: {
+    fontSize: 11,
     fontWeight: '600',
-  },
-  mcqCorrectAnswerLabel: {
-    fontSize: 14,
     color: '#64748b',
     marginBottom: 4,
   },
-  mcqCorrectAnswerText: {
+  answerText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#22c55e',
-  },
-  mcqYourAnswerLabel: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 8,
-  },
-  mcqYourAnswerText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ef4444',
+    fontWeight: '600',
+    color: '#1e293b',
   },
 });

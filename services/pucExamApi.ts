@@ -127,62 +127,61 @@ export interface SubmissionStatusResponse {
 
 export interface McqQuestionResult {
   questionId: string;
-  questionNumber: number;
-  questionText: string;
-  options: string[];
+  selectedOption: string;
   correctAnswer: string;
-  studentAnswer?: string;
   isCorrect: boolean;
-  marks: number;
+  marksAwarded: number;
+  // Optional fields for UI display
+  questionNumber?: number;
+  questionText?: string;
+  options?: string[];
 }
 
 // Step-by-step analysis for subjective answers (matches API response)
 export interface StepAnalysisItem {
-  step?: number;           // Step number from API
-  stepNumber?: number;     // Alternative field name
-  description: string;
-  isCorrect?: boolean;
-  marks?: number;          // Alternative field name
-  marksAwarded?: number;   // API field name
-  maxMarks?: number;       // Alternative field name
-  maxMarksForStep?: number; // API field name
-  feedback?: string;
+  step: number;              // Step number (1-indexed)
+  description: string;       // Step description
+  isCorrect: boolean;        // Whether this step is correct
+  marksAwarded: number;      // Marks awarded for this step (0 or 1)
+  maxMarksForStep: number;   // Max marks for step (always 1.0)
+  feedback: string;          // Feedback for this step
 }
 
 export interface SubjectiveResult {
   questionId: string;
   questionNumber: number;
-  questionText?: string;
-  earnedMarks: number;
-  maxMarks: number;
-  score?: number; // Alternative name for earnedMarks
-  isFullyCorrect?: boolean; // From API - true if answer is complete
-  expectedAnswer: string;
-  studentAnswer?: string;
-  studentAnswerEcho?: string; // API field for extracted student answer
-  stepAnalysis?: StepAnalysisItem[];
-  overallFeedback: string;
-  feedback?: string; // Alternative name for overallFeedback
-  improvementSuggestions?: string;
-  isComplete?: boolean; // Indicates if answer was fully complete
+  questionText: string;
+  earnedMarks: number;           // Marks earned for this question
+  maxMarks: number;              // Max marks for this question (number of steps)
+  isFullyCorrect: boolean;       // True if all steps are correct
+  expectedAnswer: string;        // Expected/correct answer
+  studentAnswerEcho: string;     // Extracted student answer from OCR
+  stepAnalysis: StepAnalysisItem[]; // Step-by-step evaluation
+  overallFeedback: string;       // Overall feedback for the answer
 }
 
 export interface ExamResult {
   examId: string;
   studentId: string;
-  examTitle?: string; // From API
-  mcqScore: number;
-  mcqTotalMarks: number;
-  subjectiveScore: number;
-  subjectiveTotalMarks: number;
-  grandScore: number;
-  grandTotalMarks: number;
-  percentage: number;
-  grade: string;
-  passed: boolean;
-  evaluatedAt?: string; // From API
-  mcqResults?: McqQuestionResult[];
-  subjectiveResults: SubjectiveResult[];
+  examTitle: string;              // "Subject - Chapter" format
+  
+  // MCQ section (scaled to 15 marks)
+  mcqScore: number;               // MCQ marks earned
+  mcqTotalMarks: number;          // MCQ max marks (15)
+  mcqResults: McqQuestionResult[]; // Individual MCQ results
+  
+  // Subjective section (scaled to 85 marks)
+  subjectiveScore: number;        // Subjective marks earned
+  subjectiveTotalMarks: number;   // Subjective max marks (85)
+  subjectiveResults: SubjectiveResult[]; // Individual subjective results
+  
+  // Overall results
+  grandScore: number;             // Total score (mcq + subjective)
+  grandTotalMarks: number;        // Total max marks (100)
+  percentage: number;             // Score percentage
+  grade: string;                  // A+/A/B/C/D/F
+  passed: boolean;                // true if percentage >= 35
+  evaluatedAt: string;            // Evaluation timestamp
 }
 
 // Legacy types for backward compatibility
@@ -752,11 +751,16 @@ export async function getExamResults(
       );
     }
 
-    const results = await response.json();
+    const results: ExamResult = await response.json();
     console.log('✅ [GET RESULTS] Results retrieved successfully');
-    console.log('   - MCQ Questions:', results.mcqResult?.length || 0);
+    console.log('   - Exam Title:', results.examTitle);
+    console.log('   - MCQ Score:', results.mcqScore, '/', results.mcqTotalMarks);
+    console.log('   - MCQ Questions:', results.mcqResults?.length || 0);
+    console.log('   - Subjective Score:', results.subjectiveScore, '/', results.subjectiveTotalMarks);
     console.log('   - Subjective Questions:', results.subjectiveResults?.length || 0);
-    console.log('   - Total Score:', results.totalScore || 'N/A');
+    console.log('   - Grand Score:', results.grandScore, '/', results.grandTotalMarks);
+    console.log('   - Percentage:', results.percentage, '%');
+    console.log('   - Grade:', results.grade, '| Passed:', results.passed);
     
     return results;
   } catch (error: any) {

@@ -97,19 +97,63 @@ export interface EvaluationResult {
 /**
  * Normalize API response to handle different field naming conventions
  * 
+ * New format (preferred): mcqResults[], subjectiveResults[] with stepAnalysis
  * Full evaluation response: totalScore, maxScore, questionEvaluations (MCQ + subjective), rubricBreakdown
  * MCQ-only response: score, totalMarks, results (MCQ only)
  * 
  * Frontend expects: grandScore, grandTotalMarks, mcqResults, subjectiveResults, stepAnalysis
  */
 function normalizeEvaluationResult(data: any): EvaluationResult {
+  // Check for new format first - has separate mcqResults and subjectiveResults arrays
+  const hasNewFormat = (data.mcqResults && Array.isArray(data.mcqResults)) || 
+                       (data.subjectiveResults && Array.isArray(data.subjectiveResults));
+  
   // Detect if this is an MCQ-only response (has 'score' and 'results' at top level)
-  const isMcqOnlyResponse = data.results && Array.isArray(data.results) && !data.questionEvaluations;
+  const isMcqOnlyResponse = data.results && Array.isArray(data.results) && !data.questionEvaluations && !hasNewFormat;
   
   let mcqResults: any[] = [];
   let subjectiveResults: any[] = [];
   
-  if (isMcqOnlyResponse) {
+  if (hasNewFormat) {
+    // New API format with separate mcqResults and subjectiveResults arrays
+    console.log('\n📊 [NORMALIZE] Detected NEW format with mcqResults/subjectiveResults arrays');
+    console.log('📊 [NORMALIZE] MCQ Results:', (data.mcqResults || []).length, 'items');
+    console.log('📊 [NORMALIZE] Subjective Results:', (data.subjectiveResults || []).length, 'items');
+    
+    // Map MCQ results
+    mcqResults = (data.mcqResults || []).map((m: any) => ({
+      questionId: m.questionId || m.QuestionId || '',
+      questionNumber: m.questionNumber ?? m.QuestionNumber ?? 0,
+      questionText: m.questionText || m.QuestionText || '',
+      selectedOption: m.selectedOption || m.SelectedOption || '',
+      correctAnswer: m.correctAnswer || m.CorrectAnswer || '',
+      isCorrect: m.isCorrect ?? m.IsCorrect ?? false,
+      marksAwarded: m.marksAwarded ?? m.MarksAwarded ?? (m.isCorrect ? 1 : 0),
+      maxMarks: m.maxMarks ?? m.MaxMarks ?? 1,
+      options: m.options || m.Options || [],
+    }));
+    
+    // Map Subjective results with stepAnalysis
+    subjectiveResults = (data.subjectiveResults || []).map((s: any) => ({
+      questionId: s.questionId || s.QuestionId || '',
+      questionNumber: s.questionNumber ?? s.QuestionNumber ?? 0,
+      questionText: s.questionText || s.QuestionText || '',
+      earnedMarks: s.earnedMarks ?? s.EarnedMarks ?? s.awardedScore ?? s.AwardedScore ?? 0,
+      maxMarks: s.maxMarks ?? s.MaxMarks ?? s.maxScore ?? s.MaxScore ?? 0,
+      isFullyCorrect: s.isFullyCorrect ?? s.IsFullyCorrect ?? false,
+      expectedAnswer: s.expectedAnswer || s.ExpectedAnswer || s.modelAnswer || s.ModelAnswer || '',
+      studentAnswerEcho: s.studentAnswerEcho || s.StudentAnswerEcho || s.extractedAnswer || s.ExtractedAnswer || '',
+      overallFeedback: s.overallFeedback || s.OverallFeedback || s.feedback || s.Feedback || '',
+      stepAnalysis: (s.stepAnalysis || s.StepAnalysis || []).map((step: any, idx: number) => ({
+        step: step.step ?? step.Step ?? idx + 1,
+        description: step.description || step.Description || `Step ${idx + 1}`,
+        isCorrect: step.isCorrect ?? step.IsCorrect ?? false,
+        marksAwarded: step.marksAwarded ?? step.MarksAwarded ?? 0,
+        maxMarksForStep: step.maxMarksForStep ?? step.MaxMarksForStep ?? 1,
+        feedback: step.feedback || step.Feedback || '',
+      })),
+    }));
+  } else if (isMcqOnlyResponse) {
     // MCQ-only response format
     console.log('\n📊 [NORMALIZE] Detected MCQ-only response format');
     console.log('📊 [NORMALIZE] MCQ Results array:', data.results?.length || 0, 'items');
@@ -489,17 +533,29 @@ export async function getEvaluationResultsBySubmissionId(
       console.log('═══════════════════════════════════════════════════════════\n');
       
       // Check if data has nested evaluationResult field (new API format)
-      if (data.evaluationResult && !data.questionEvaluations) {
+      if (data.evaluationResult) {
         console.log('📊 [GET RESULTS] Detected nested evaluationResult format - extracting...');
+        
+        // Handle double-nested evaluationResult (old format: evaluationResult.evaluationResult)
+        let evalResult = data.evaluationResult;
+        if (evalResult.evaluationResult && (evalResult.evaluationResult.mcqResults || evalResult.evaluationResult.subjectiveResults || evalResult.evaluationResult.questionEvaluations)) {
+          console.log('📊 [GET RESULTS] Found double-nested evaluationResult - extracting inner result');
+          evalResult = evalResult.evaluationResult;
+        }
+        
         // Merge summary data with evaluationResult
         const mergedData = {
-          ...data.evaluationResult,
+          ...evalResult,
           // Use summary if available for correct totals
-          grandScore: data.summary?.totalScore ?? data.evaluationResult.totalScore,
-          grandTotalMarks: data.summary?.maxPossibleScore ?? data.evaluationResult.maxScore,
-          percentage: data.summary?.percentage ?? data.evaluationResult.percentage,
-          grade: data.summary?.grade ?? data.evaluationResult.grade,
+          grandScore: data.summary?.totalScore ?? evalResult.grandScore ?? evalResult.totalScore,
+          grandTotalMarks: data.summary?.maxPossibleScore ?? evalResult.grandTotalMarks ?? evalResult.maxScore,
+          percentage: data.summary?.percentage ?? evalResult.percentage,
+          grade: data.summary?.grade ?? evalResult.grade,
         };
+        console.log('📊 [GET RESULTS] Merged data keys:', Object.keys(mergedData).join(', '));
+        console.log('📊 [GET RESULTS] mcqResults count:', (mergedData.mcqResults || []).length);
+        console.log('📊 [GET RESULTS] subjectiveResults count:', (mergedData.subjectiveResults || []).length);
+        
         const normalizedResult = normalizeEvaluationResult(mergedData);
         console.log('📊 [GET RESULTS] Normalized - grand Score:', normalizedResult.grandScore, 'percentage:', normalizedResult.percentage);
         return normalizedResult;

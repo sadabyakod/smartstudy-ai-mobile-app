@@ -112,7 +112,7 @@ function McqResultItem({ mcqRes, styles }: { mcqRes: any; styles: any }) {
 }
 
 export default function PUCExamScreen() {
-  const { navigate, goBack, canGoBack, setPendingEvaluation, completedEvaluation, setCompletedEvaluation } = useContext(NavigationContext);
+  const { navigate, goBack, canGoBack, setPendingEvaluation, completedEvaluation, setCompletedEvaluation, setResultsScreenData } = useContext(NavigationContext);
   
   // Form state
   const [selectedSubject, setSelectedSubject] = useState(PUC_SUBJECTS[0]);
@@ -2063,7 +2063,7 @@ export default function PUCExamScreen() {
                 </Text>
               </View>
 
-              <TouchableOpacity style={styles.actionButton} onPress={() => navigate("learningHub")}>
+              <TouchableOpacity style={styles.actionButton} onPress={() => navigate("home")}>
                 <LinearGradient
                   colors={["#4F46E5", "#7C3AED"]}
                   style={styles.buttonGradient}
@@ -2495,6 +2495,28 @@ export default function PUCExamScreen() {
             )}
 
             {/* Action Buttons */}
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={() => {
+                // Navigate to full results screen with current exam data
+                setResultsScreenData({
+                  examResult: examResult,
+                  examId: generatedExam?.examId,
+                  studentId: studentId || undefined,
+                  examTitle: generatedExam?.subject ? `${selectedGrade} - ${generatedExam.subject}` : undefined,
+                });
+                navigate("results");
+              }}
+            >
+              <LinearGradient
+                colors={["#22C55E", "#16A34A"]}
+                style={styles.buttonGradient}
+              >
+                <Ionicons name="document-text" size={24} color="#fff" />
+                <Text style={styles.buttonText}>View Full Results</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            
             <TouchableOpacity style={styles.actionButton} onPress={handleStartNew}>
               <LinearGradient
                 colors={["#4F46E5", "#7C3AED"]}
