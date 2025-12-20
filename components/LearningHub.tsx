@@ -16,6 +16,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { NavigationContext } from "../navigation/NavigationContext";
 import { checkSubmissionStatus, SubmissionStatusResponse, isEvaluationComplete, isEvaluationFailed } from "../services/pucExamApi";
 import { getEvaluationResultsBySubmissionId } from "../services/answerSheetApi";
+import { saveEvaluationToHistory } from "../services/evaluationHistoryService";
 import { 
   SPACING, 
   TYPOGRAPHY, 
@@ -170,6 +171,14 @@ export default function LearningHub() {
           // Check if we have result in status response as fallback
           if (status.result) {
             console.log('🔄 [LearningHub] Using fallback result from status');
+            // Save to history
+            await saveEvaluationToHistory(
+              pendingEvaluation.examId,
+              pendingEvaluation.studentId,
+              pendingEvaluation.subject,
+              `${pendingEvaluation.subject} Exam`,
+              status.result
+            );
             setCompletedEvaluation({
               writtenSubmissionId: pendingEvaluation.writtenSubmissionId,
               result: status.result
@@ -192,6 +201,14 @@ export default function LearningHub() {
           }
         } else {
           console.log('✅ [LearningHub] Full results received! Navigating to results...');
+          // Save to history
+          await saveEvaluationToHistory(
+            pendingEvaluation.examId,
+            pendingEvaluation.studentId,
+            pendingEvaluation.subject,
+            `${pendingEvaluation.subject} Exam`,
+            fullResults as any
+          );
           // Set completed evaluation data and navigate directly to results screen
           setCompletedEvaluation({
             writtenSubmissionId: pendingEvaluation.writtenSubmissionId,
@@ -264,6 +281,14 @@ export default function LearningHub() {
       icon: "download-outline",
       gradient: COLORS.modelPapers,
       action: () => navigate("syllabus"),
+    },
+    {
+      id: 5,
+      title: "My Results",
+      description: "View past evaluations",
+      icon: "trophy-outline",
+      gradient: ["#7C3AED", "#9333EA"] as [string, string],
+      action: () => navigate("evaluation-history"),
     },
   ];
 

@@ -1,7 +1,7 @@
 import React from "react";
 import type { ExamResult } from "../services/pucExamApi";
 
-export type Screen = "home" | "chat" | "exam" | "puc-exam" | "syllabus" | "download-papers" | "results";
+export type Screen = "home" | "chat" | "exam" | "puc-exam" | "syllabus" | "download-papers" | "results" | "evaluation-history";
 
 export interface PendingEvaluation {
   writtenSubmissionId: string;

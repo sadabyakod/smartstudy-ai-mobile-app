@@ -7,7 +7,8 @@ import ModelPaperScreen from "./components/ModelPaperScreen";
 import PUCExamScreen from "./components/PUCExamScreen";
 import SyllabusScreen from "./components/SyllabusScreen";
 import DownloadModelPapersScreen from "./components/DownloadModelPapersScreen";
- import ResultsScreen from "./components/ResultsScreen";
+import ResultsScreen from "./components/ResultsScreen";
+import EvaluationHistoryScreen from "./components/EvaluationHistoryScreen";
 import { NavigationContext, Screen, PendingEvaluation, CompletedEvaluationResult, ResultsScreenData } from "./navigation/NavigationContext";
 
 export default function App() {
@@ -52,6 +53,12 @@ export default function App() {
               setResultsScreenData(null);
               goBack();
             }}
+          />
+        );
+      case "evaluation-history":
+        return (
+          <EvaluationHistoryScreen 
+            onBack={() => goBack()}
           />
         );
       default:
