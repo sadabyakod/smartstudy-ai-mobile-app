@@ -377,12 +377,10 @@ function McqQuestionResult({
                 {result.selectedOption || 'Not answered'}
               </Text>
             </View>
-            {!result.isCorrect && (
-              <View style={[styles.answerBlock, styles.answerCorrect]}>
-                <Text style={styles.answerLabel}>Correct Answer</Text>
-                <Text style={styles.answerText}>{result.correctAnswer}</Text>
-              </View>
-            )}
+            <View style={[styles.answerBlock, styles.answerCorrect]}>
+              <Text style={styles.answerLabel}>Correct Answer</Text>
+              <Text style={styles.answerText}>{result.correctAnswer}</Text>
+            </View>
           </View>
           
           {/* Correct Answer Banner */}
