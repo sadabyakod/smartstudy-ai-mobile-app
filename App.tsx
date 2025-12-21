@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import LearningHub from "./components/LearningHub";
@@ -9,6 +9,7 @@ import SyllabusScreen from "./components/SyllabusScreen";
 import DownloadModelPapersScreen from "./components/DownloadModelPapersScreen";
 import ResultsScreen from "./components/ResultsScreen";
 import EvaluationHistoryScreen from "./components/EvaluationHistoryScreen";
+import OnboardingScreen, { isOnboardingCompleted } from "./components/OnboardingScreen";
 import { NavigationContext, Screen, PendingEvaluation, CompletedEvaluationResult, ResultsScreenData } from "./navigation/NavigationContext";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 
@@ -18,6 +19,30 @@ function AppContent() {
   const [pendingEvaluation, setPendingEvaluation] = useState<PendingEvaluation | null>(null);
   const [completedEvaluation, setCompletedEvaluation] = useState<CompletedEvaluationResult | null>(null);
   const [resultsScreenData, setResultsScreenData] = useState<ResultsScreenData | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    checkOnboardingStatus();
+  }, []);
+
+  const checkOnboardingStatus = async () => {
+    const completed = await isOnboardingCompleted();
+    setShowOnboarding(!completed);
+  };
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+  };
+
+  // Show loading state while checking onboarding status
+  if (showOnboarding === null) {
+    return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
+  }
+
+  // Show onboarding if not completed
+  if (showOnboarding) {
+    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+  }
 
   const currentScreen = stack[stack.length - 1];
   const canGoBack = stack.length > 1;
