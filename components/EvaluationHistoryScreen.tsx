@@ -9,10 +9,13 @@ import {
   Alert,
   Dimensions,
   Share,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { NavigationContext } from '../navigation/NavigationContext';
 import { useTheme } from '../contexts/ThemeContext';
 import {
@@ -53,6 +56,7 @@ export default function EvaluationHistoryScreen({ onBack }: Props) {
   const [history, setHistory] = useState<EvaluationHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState<string | null>(null);
 
   useEffect(() => {
     loadHistory();
@@ -122,6 +126,257 @@ export default function EvaluationHistoryScreen({ onBack }: Props) {
         },
       ]
     );
+  };
+
+  const handleExportPDF = async (item: EvaluationHistoryItem) => {
+    try {
+      setExportingPDF(item.id);
+      const fullResult = item.fullResult;
+
+      // Generate HTML content for PDF
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body {
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                padding: 30px;
+                background-color: #ffffff;
+                color: #1E293B;
+                line-height: 1.6;
+              }
+              .header {
+                text-align: center;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 3px solid #2563EB;
+              }
+              .header h1 {
+                color: #2563EB;
+                margin: 0 0 10px 0;
+                font-size: 28px;
+              }
+              .header p {
+                color: #64748B;
+                margin: 5px 0;
+                font-size: 14px;
+              }
+              .summary-box {
+                background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
+                color: white;
+                padding: 25px;
+                border-radius: 12px;
+                margin: 20px 0;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+              }
+              .summary-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+                margin-top: 15px;
+              }
+              .summary-item {
+                text-align: center;
+              }
+              .summary-value {
+                font-size: 32px;
+                font-weight: bold;
+                margin-bottom: 5px;
+              }
+              .summary-label {
+                font-size: 14px;
+                opacity: 0.9;
+              }
+              .section {
+                margin: 30px 0;
+                padding: 20px;
+                background: #F8FAFC;
+                border-radius: 12px;
+                border-left: 4px solid #2563EB;
+              }
+              .section-title {
+                font-size: 20px;
+                font-weight: bold;
+                color: #2563EB;
+                margin-bottom: 15px;
+                display: flex;
+                align-items: center;
+              }
+              .question-card {
+                background: white;
+                padding: 15px;
+                margin: 10px 0;
+                border-radius: 8px;
+                border: 1px solid #E2E8F0;
+              }
+              .question-header {
+                font-weight: bold;
+                color: #1E293B;
+                margin-bottom: 8px;
+              }
+              .question-text {
+                color: #475569;
+                margin: 8px 0;
+                line-height: 1.5;
+              }
+              .score-badge {
+                display: inline-block;
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-weight: bold;
+                font-size: 14px;
+              }
+              .score-correct {
+                background: #DCFCE7;
+                color: #16A34A;
+              }
+              .score-partial {
+                background: #FEF3C7;
+                color: #CA8A04;
+              }
+              .score-incorrect {
+                background: #FEE2E2;
+                color: #DC2626;
+              }
+              .footer {
+                text-align: center;
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 2px solid #E2E8F0;
+                color: #64748B;
+                font-size: 12px;
+              }
+              .grade-display {
+                font-size: 48px;
+                font-weight: bold;
+                text-align: center;
+                margin: 10px 0;
+              }
+              .status-badge {
+                display: inline-block;
+                padding: 8px 20px;
+                border-radius: 25px;
+                font-weight: bold;
+                font-size: 16px;
+                margin: 10px 0;
+              }
+              .status-passed {
+                background: #DCFCE7;
+                color: #16A34A;
+              }
+              .status-failed {
+                background: #FEE2E2;
+                color: #DC2626;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>📊 Examination Evaluation Report</h1>
+              <p><strong>${item.examTitle}</strong></p>
+              <p>Subject: ${item.subject}</p>
+              <p>Date: ${formatDate(item.evaluatedAt)}</p>
+            </div>
+
+            <div class="summary-box">
+              <div class="grade-display">${item.grade}</div>
+              <div class="summary-grid">
+                <div class="summary-item">
+                  <div class="summary-value">${item.grandScore}/${item.grandTotalMarks}</div>
+                  <div class="summary-label">Total Score</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-value">${item.percentage?.toFixed(1)}%</div>
+                  <div class="summary-label">Percentage</div>
+                </div>
+              </div>
+              <div style="text-align: center; margin-top: 15px;">
+                <span class="status-badge ${item.passed ? 'status-passed' : 'status-failed'}">
+                  ${item.passed ? '✅ PASSED' : '❌ FAILED'}
+                </span>
+              </div>
+            </div>
+
+            ${fullResult?.mcqResults && fullResult.mcqResults.length > 0 ? `
+              <div class="section">
+                <div class="section-title">📋 Multiple Choice Questions</div>
+                <p><strong>Score:</strong> ${fullResult.mcqScore || fullResult.mcqResults.filter((m: any) => m.isCorrect).length}/${fullResult.mcqTotalMarks || fullResult.mcqResults.length}</p>
+                ${fullResult.mcqResults.map((q: any, idx: number) => `
+                  <div class="question-card">
+                    <div class="question-header">Question ${idx + 1}</div>
+                    <div class="question-text">${q.question || 'N/A'}</div>
+                    <p><strong>Your Answer:</strong> ${q.selectedAnswer || 'Not answered'}</p>
+                    <p><strong>Correct Answer:</strong> ${q.correctAnswer}</p>
+                    <span class="score-badge ${q.isCorrect ? 'score-correct' : 'score-incorrect'}">
+                      ${q.isCorrect ? '✓ Correct' : '✗ Incorrect'}
+                    </span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            ${fullResult?.subjectiveResults && fullResult.subjectiveResults.length > 0 ? `
+              <div class="section">
+                <div class="section-title">✍️ Subjective Questions</div>
+                <p><strong>Score:</strong> ${fullResult.subjectiveScore}/${fullResult.subjectiveTotalMarks}</p>
+                ${fullResult.subjectiveResults.map((q: any, idx: number) => {
+                  const qNum = q.questionNumber || idx + 1;
+                  const earned = q.earnedMarks ?? q.score ?? 0;
+                  const max = q.maxMarks || 1;
+                  const percentage = (earned / max) * 100;
+                  const badgeClass = percentage >= 70 ? 'score-correct' : percentage >= 40 ? 'score-partial' : 'score-incorrect';
+                  
+                  return `
+                    <div class="question-card">
+                      <div class="question-header">Question ${qNum}</div>
+                      <div class="question-text">${q.questionText || 'N/A'}</div>
+                      ${q.studentAnswer ? `<p><strong>Your Answer:</strong> ${q.studentAnswer.substring(0, 200)}${q.studentAnswer.length > 200 ? '...' : ''}</p>` : ''}
+                      ${q.feedback ? `<p><strong>Feedback:</strong> ${q.feedback}</p>` : ''}
+                      <span class="score-badge ${badgeClass}">
+                        ${earned}/${max} marks (${percentage.toFixed(0)}%)
+                      </span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : ''}
+
+            <div class="footer">
+              <p><strong>Smart Study AI - Evaluation System</strong></p>
+              <p>Generated on ${new Date().toLocaleString('en-IN')}</p>
+              <p>This is a computer-generated report. No signature is required.</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      // Generate PDF
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+
+      // Share or save PDF
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `${item.examTitle} - Report`,
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert(
+          'PDF Generated',
+          `PDF saved at: ${uri}`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      Alert.alert('Export Failed', 'Failed to generate PDF report. Please try again.');
+    } finally {
+      setExportingPDF(null);
+    }
   };
 
   const handleShareEvaluation = async (item: EvaluationHistoryItem) => {
@@ -396,17 +651,37 @@ export default function EvaluationHistoryScreen({ onBack }: Props) {
                     <Ionicons name="time-outline" size={14} color={theme.colors.textTertiary} />
                     <Text style={[styles.dateText, { color: theme.colors.textTertiary }]}>{formatDate(item.evaluatedAt)}</Text>
                   </View>
-                  <TouchableOpacity 
-                    style={styles.shareButton}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleShareEvaluation(item);
-                    }}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Ionicons name="share-social-outline" size={18} color={COLORS.primary} />
-                    <Text style={styles.shareButtonText}>Share</Text>
-                  </TouchableOpacity>
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity 
+                      style={styles.pdfButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleExportPDF(item);
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      disabled={exportingPDF === item.id}
+                    >
+                      {exportingPDF === item.id ? (
+                        <ActivityIndicator size="small" color={COLORS.primary} />
+                      ) : (
+                        <>
+                          <Ionicons name="document-text-outline" size={18} color={COLORS.primary} />
+                          <Text style={styles.pdfButtonText}>PDF</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.shareButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleShareEvaluation(item);
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="share-social-outline" size={18} color={COLORS.primary} />
+                      <Text style={styles.shareButtonText}>Share</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </TouchableOpacity>
             ))}
@@ -561,6 +836,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textTertiary,
     marginLeft: 6,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  pdfButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+    minWidth: 65,
+    justifyContent: 'center',
+  },
+  pdfButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
   shareButton: {
     flexDirection: 'row',

@@ -24,6 +24,7 @@ import {
   ChatHistoryItem,
 } from "../services/chatApi";
 import { NavigationContext } from "../navigation/NavigationContext";
+import { useTheme } from "../contexts/ThemeContext";
 
 type ChatMessage = {
   id: string;
@@ -46,6 +47,7 @@ const initialMessages: ChatMessage[] = [
 
 export default function ChatScreen() {
   const { navigate } = useContext(NavigationContext);
+  const { theme } = useTheme();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showBotTooltip, setShowBotTooltip] = useState(false);
   const botTooltipAnim = useRef(new Animated.Value(0)).current;
@@ -572,8 +574,8 @@ export default function ChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <LinearGradient colors={["#f8fafc", "#eef2ff", "#e0e7ff"]} style={styles.gradient}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.gradient, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -652,7 +654,7 @@ export default function ChatScreen() {
             {isHistoryLoading && (
               <View style={styles.historyLoader}>
                 <ActivityIndicator size="small" color="#2563EB" />
-                <Text style={styles.historyLoaderText}>Loading previous messages…</Text>
+                <Text style={[styles.historyLoaderText, { color: theme.colors.textSecondary }]}>Loading previous messages…</Text>
               </View>
             )}
 
@@ -707,9 +709,9 @@ export default function ChatScreen() {
                       <Ionicons name="sparkles" size={14} color="#667eea" />
                     </View>
                     <View style={styles.botBubbleContainer}>
-                      <View style={styles.botBubble}>
-                        <Text style={styles.botText}>{item.text}</Text>
-                        <Text style={styles.timeText}>{item.time}</Text>
+                      <View style={[styles.botBubble, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+                        <Text style={[styles.botText, { color: theme.colors.text }]}>{item.text}</Text>
+                        <Text style={[styles.timeText, { color: theme.colors.textSecondary }]}>{item.time}</Text>
                       </View>
                       <View style={styles.actionBar}>
                         <TouchableOpacity onPress={() => handleCopy(item.text)} style={styles.actionButton}>
@@ -730,7 +732,7 @@ export default function ChatScreen() {
                 <View style={styles.botAvatarSmall}>
                   <Ionicons name="sparkles" size={14} color="#667eea" />
                 </View>
-                <View style={styles.typingBubble}>
+                <View style={[styles.typingBubble, { backgroundColor: theme.colors.surface }]}>
                   <View style={styles.dotContainer}>
                     <Animated.View
                       style={[styles.dot, { transform: [{ translateY: dot1 }] }]}
@@ -742,7 +744,7 @@ export default function ChatScreen() {
                       style={[styles.dot, { transform: [{ translateY: dot3 }] }]}
                     />
                   </View>
-                  <Text style={styles.typingText}>AI is thinking...</Text>
+                  <Text style={[styles.typingText, { color: theme.colors.textSecondary }]}>AI is thinking...</Text>
                 </View>
               </View>
             )}
@@ -750,7 +752,7 @@ export default function ChatScreen() {
 
           {/* FOLLOW-UP QUESTION CHIP */}
           {followUpQuestion && (
-            <View style={styles.followUpContainer}>
+            <View style={[styles.followUpContainer, { backgroundColor: theme.colors.background }]}>
               <TouchableOpacity
                 style={styles.followUpChip}
                 onPress={() => {
@@ -777,14 +779,15 @@ export default function ChatScreen() {
             }}
           >
             <View style={styles.modalOverlay}>
-              <View style={styles.editModalContainer}>
+              <View style={[styles.editModalContainer, { backgroundColor: theme.colors.surface }]}>
                 <TextInput
-                  style={styles.editModalInput}
+                  style={[styles.editModalInput, { color: theme.colors.text, backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
                   value={editText}
                   onChangeText={setEditText}
                   multiline
                   autoFocus
                   placeholder="Edit your message..."
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
                 <View style={styles.editModalButtons}>
                   <TouchableOpacity 
@@ -810,18 +813,18 @@ export default function ChatScreen() {
           </Modal>
 
           {/* INPUT */}
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
+          <View style={[styles.inputContainer, { backgroundColor: theme.colors.background }]}>
+            <View style={[styles.inputWrapper, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
               <View style={styles.inputIconLeft}>
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#9CA3AF" />
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color={theme.colors.textSecondary} />
               </View>
               <TextInput
-                style={[styles.input, { height: Math.max(44, inputHeight) }]}
+                style={[styles.input, { height: Math.max(44, inputHeight), color: theme.colors.text }]}
                 placeholder="Ask me anything about your studies..."
                 value={input}
                 onChangeText={setInput}
                 onSubmitEditing={() => handleSend(input)}
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.colors.textSecondary}
                 multiline
                 onContentSizeChange={(e) =>
                   setInputHeight(e.nativeEvent.contentSize.height)
@@ -848,12 +851,12 @@ export default function ChatScreen() {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-            <Text style={styles.poweredBy}>Powered by AI • SmartStudy</Text>
+            <Text style={[styles.poweredBy, { color: theme.colors.textSecondary }]}>Powered by AI • SmartStudy</Text>
           </View>
 
           <View style={{ height: Platform.OS === "ios" ? 10 : 25 }} />
         </KeyboardAvoidingView>
-      </LinearGradient>
+      </View>
     </SafeAreaView>
   );
 }
