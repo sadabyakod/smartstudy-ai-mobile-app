@@ -10,8 +10,10 @@ import DownloadModelPapersScreen from "./components/DownloadModelPapersScreen";
 import ResultsScreen from "./components/ResultsScreen";
 import EvaluationHistoryScreen from "./components/EvaluationHistoryScreen";
 import { NavigationContext, Screen, PendingEvaluation, CompletedEvaluationResult, ResultsScreenData } from "./navigation/NavigationContext";
+import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 
-export default function App() {
+function AppContent() {
+  const { theme } = useTheme();
   const [stack, setStack] = useState<Screen[]>(["home"]);
   const [pendingEvaluation, setPendingEvaluation] = useState<PendingEvaluation | null>(null);
   const [completedEvaluation, setCompletedEvaluation] = useState<CompletedEvaluationResult | null>(null);
@@ -67,25 +69,33 @@ export default function App() {
   };
 
   return (
-    <SafeAreaProvider>
-      <NavigationContext.Provider value={{ 
-        currentScreen, 
-        navigate, 
-        goBack, 
-        canGoBack,
-        pendingEvaluation,
-        setPendingEvaluation,
-        completedEvaluation,
-        setCompletedEvaluation,
-        resultsScreenData,
-        setResultsScreenData
-      }}>
-        <View style={styles.container}>
-          <View style={styles.content}>
-            {renderScreen()}
-          </View>
+    <NavigationContext.Provider value={{ 
+      currentScreen, 
+      navigate, 
+      goBack, 
+      canGoBack,
+      pendingEvaluation,
+      setPendingEvaluation,
+      completedEvaluation,
+      setCompletedEvaluation,
+      resultsScreenData,
+      setResultsScreenData
+    }}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.content}>
+          {renderScreen()}
         </View>
-      </NavigationContext.Provider>
+      </View>
+    </NavigationContext.Provider>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -93,7 +103,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F1F5F9",
   },
   content: {
     flex: 1,

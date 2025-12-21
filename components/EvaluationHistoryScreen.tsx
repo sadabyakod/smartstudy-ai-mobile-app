@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { NavigationContext } from '../navigation/NavigationContext';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   EvaluationHistoryItem,
   getEvaluationHistory,
@@ -48,6 +49,7 @@ interface Props {
 
 export default function EvaluationHistoryScreen({ onBack }: Props) {
   const { navigate, setResultsScreenData } = useContext(NavigationContext);
+  const { theme } = useTheme();
   const [history, setHistory] = useState<EvaluationHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -280,7 +282,7 @@ export default function EvaluationHistoryScreen({ onBack }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
       {/* Header */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.primaryLight]}
@@ -306,7 +308,7 @@ export default function EvaluationHistoryScreen({ onBack }: Props) {
 
       {/* Content */}
       <ScrollView
-        style={styles.scrollView}
+        style={[styles.scrollView, { backgroundColor: theme.colors.background }]}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
@@ -314,15 +316,15 @@ export default function EvaluationHistoryScreen({ onBack }: Props) {
       >
         {loading ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.loadingText}>Loading history...</Text>
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading history...</Text>
           </View>
         ) : history.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconContainer}>
               <Ionicons name="document-text-outline" size={64} color={COLORS.textTertiary} />
             </View>
-            <Text style={styles.emptyTitle}>No Evaluations Yet</Text>
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Evaluations Yet</Text>
+            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
               Your exam evaluation results will appear here after you complete exams.
             </Text>
             <TouchableOpacity 
@@ -336,10 +338,78 @@ export default function EvaluationHistoryScreen({ onBack }: Props) {
           </View>
         ) : (
           <>
-            <Text style={styles.sectionHint}>
+            <Text style={[styles.sectionHint, { color: theme.colors.textSecondary }]}>
               💡 Tap to view details • Long press to delete
             </Text>
-            {history.map((item, index) => renderHistoryItem(item, index))}
+            {history.map((item, index) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.historyCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+                onPress={() => handleViewResult(item)}
+                onLongPress={() => handleDeleteItem(item)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardLeft}>
+                    <View style={[styles.gradeCircle, { backgroundColor: getGradeColor(item.grade) }]}>
+                      <Text style={styles.gradeText}>{item.grade}</Text>
+                    </View>
+                    <View style={styles.cardInfo}>
+                      <Text style={[styles.examTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                        {item.examTitle}
+                      </Text>
+                      <Text style={[styles.examSubject, { color: theme.colors.textSecondary }]}>{item.subject}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.cardRight}>
+                    <Ionicons name="chevron-forward" size={20} color={theme.colors.textTertiary} />
+                  </View>
+                </View>
+
+                <View style={[styles.cardDivider, { backgroundColor: theme.colors.divider }]} />
+
+                <View style={styles.cardStats}>
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statValue, { color: theme.colors.text }]}>{item.grandScore}/{item.grandTotalMarks}</Text>
+                    <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Score</Text>
+                  </View>
+                  <View style={[styles.statDivider, { backgroundColor: theme.colors.divider }]} />
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statValue, { color: getGradeColor(item.grade) }]}>
+                      {item.percentage?.toFixed(1)}%
+                    </Text>
+                    <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Percentage</Text>
+                  </View>
+                  <View style={[styles.statDivider, { backgroundColor: theme.colors.divider }]} />
+                  <View style={styles.statItem}>
+                    <Ionicons 
+                      name={item.passed ? "checkmark-circle" : "close-circle"} 
+                      size={20} 
+                      color={item.passed ? COLORS.success : COLORS.error} 
+                    />
+                    <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>{item.passed ? 'Passed' : 'Failed'}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.cardFooter}>
+                  <View style={styles.dateContainer}>
+                    <Ionicons name="time-outline" size={14} color={theme.colors.textTertiary} />
+                    <Text style={[styles.dateText, { color: theme.colors.textTertiary }]}>{formatDate(item.evaluatedAt)}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.shareButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleShareEvaluation(item);
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="share-social-outline" size={18} color={COLORS.primary} />
+                    <Text style={styles.shareButtonText}>Share</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            ))}
           </>
         )}
 

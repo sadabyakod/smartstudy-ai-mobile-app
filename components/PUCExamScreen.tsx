@@ -45,6 +45,7 @@ import {
 import { getEvaluationResultsBySubmissionId } from "../services/answerSheetApi";
 import { API_BASE_URL, getUserFriendlyErrorMessage, ERROR_MESSAGES } from "../config/api";
 import { NavigationContext } from "../navigation/NavigationContext";
+import { useTheme } from "../contexts/ThemeContext";
 
 type ScreenState = "initial" | "loading" | "exam" | "question" | "questionPaper" | "uploadAnswers" | "submitting" | "results" | "evaluating";
 type AnswerMode = "type" | "upload";
@@ -113,6 +114,7 @@ function McqResultItem({ mcqRes, styles }: { mcqRes: any; styles: any }) {
 
 export default function PUCExamScreen() {
   const { navigate, goBack, canGoBack, setPendingEvaluation, completedEvaluation, setCompletedEvaluation, setResultsScreenData } = useContext(NavigationContext);
+  const { theme } = useTheme();
   
   // Form state
   const [selectedSubject, setSelectedSubject] = useState(PUC_SUBJECTS[0]);

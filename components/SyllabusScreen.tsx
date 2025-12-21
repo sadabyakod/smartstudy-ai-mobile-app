@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { NavigationContext } from "../navigation/NavigationContext";
+import { useTheme } from "../contexts/ThemeContext";
 import { 
   getTextbooks, 
   SubjectTextbook,
@@ -52,6 +53,7 @@ const SUBJECT_COLORS: Record<string, string> = {
 
 export default function SyllabusScreen() {
   const { goBack } = React.useContext(NavigationContext);
+  const { theme } = useTheme();
   const [subjects, setSubjects] = useState<SubjectTextbook[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [files, setFiles] = useState<TextbookFile[]>([]);
@@ -116,7 +118,7 @@ export default function SyllabusScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.subjectCard}
+        style={[styles.subjectCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
         onPress={() => handleSubjectPress(item.subject)}
         activeOpacity={0.7}
       >
@@ -124,12 +126,12 @@ export default function SyllabusScreen() {
           <Ionicons name={icon as any} size={28} color={color} />
         </View>
         <View style={styles.subjectInfo}>
-          <Text style={styles.subjectName}>{item.subject}</Text>
-          <Text style={styles.subjectMeta}>
+          <Text style={[styles.subjectName, { color: theme.colors.text }]}>{item.subject}</Text>
+          <Text style={[styles.subjectMeta, { color: theme.colors.textSecondary }]}>
             {item.fileCount} file{item.fileCount !== 1 ? "s" : ""} available
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+        <Ionicons name="chevron-forward" size={20} color={theme.colors.textTertiary} />
       </TouchableOpacity>
     );
   };
@@ -142,7 +144,7 @@ export default function SyllabusScreen() {
 
   const renderFileItem = ({ item }: { item: TextbookFile }) => (
     <TouchableOpacity
-      style={styles.fileCard}
+      style={[styles.fileCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
       onPress={() => handleDownload(item)}
       activeOpacity={0.7}
     >
@@ -150,10 +152,10 @@ export default function SyllabusScreen() {
         <Ionicons name="document-text" size={24} color="#3B82F6" />
       </View>
       <View style={styles.fileInfo}>
-        <Text style={styles.fileName} numberOfLines={2}>
+        <Text style={[styles.fileName, { color: theme.colors.text }]} numberOfLines={2}>
           {item.fileName.replace(/^[a-f0-9-]+_/, '')}
         </Text>
-        <Text style={styles.fileDate}>
+        <Text style={[styles.fileDate, { color: theme.colors.textSecondary }]}>
           Size: {formatFileSize(item.size)}
         </Text>
       </View>
@@ -166,7 +168,7 @@ export default function SyllabusScreen() {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top"]}>
         <StatusBar barStyle="light-content" backgroundColor="#EA580C" />
         <LinearGradient colors={["#EA580C", "#F97316"]} style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={goBack}>
@@ -180,7 +182,7 @@ export default function SyllabusScreen() {
         </LinearGradient>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#EA580C" />
-          <Text style={styles.loadingText}>Loading subjects...</Text>
+          <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading subjects...</Text>
         </View>
       </SafeAreaView>
     );
@@ -189,7 +191,7 @@ export default function SyllabusScreen() {
   // Files view (when subject is selected)
   if (selectedSubject) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top"]}>
         <StatusBar barStyle="light-content" backgroundColor={getColor(selectedSubject)} />
         <LinearGradient 
           colors={[getColor(selectedSubject), getColor(selectedSubject) + "CC"]} 
@@ -214,12 +216,12 @@ export default function SyllabusScreen() {
         {loadingFiles ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={getColor(selectedSubject)} />
-            <Text style={styles.loadingText}>Loading files...</Text>
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading files...</Text>
           </View>
         ) : error ? (
           <View style={styles.centered}>
             <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={[styles.errorText, { color: theme.colors.text }]}>{error}</Text>
             <TouchableOpacity 
               style={styles.retryButton}
               onPress={() => handleSubjectPress(selectedSubject)}
@@ -230,7 +232,7 @@ export default function SyllabusScreen() {
         ) : files.length === 0 ? (
           <View style={styles.centered}>
             <Ionicons name="document-outline" size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>No files available for {selectedSubject}</Text>
+            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>No files available for {selectedSubject}</Text>
           </View>
         ) : (
           <FlatList
@@ -246,7 +248,7 @@ export default function SyllabusScreen() {
 
   // Subjects list view
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor="#EA580C" />
 
       {/* Header */}
@@ -269,7 +271,7 @@ export default function SyllabusScreen() {
       {error ? (
         <View style={styles.centered}>
           <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorText, { color: theme.colors.text }]}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadSubjects}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
@@ -277,13 +279,13 @@ export default function SyllabusScreen() {
       ) : subjects.length === 0 ? (
         <View style={styles.centered}>
           <Ionicons name="folder-open-outline" size={48} color="#9CA3AF" />
-          <Text style={styles.emptyText}>No subjects available</Text>
+          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>No subjects available</Text>
         </View>
       ) : (
         <>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Select Subject</Text>
-            <Text style={styles.sectionSubtitle}>Tap to view available syllabus files</Text>
+          <View style={[styles.sectionHeader, { backgroundColor: theme.colors.background }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Subject</Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>Tap to view available syllabus files</Text>
           </View>
           <FlatList
             data={subjects}

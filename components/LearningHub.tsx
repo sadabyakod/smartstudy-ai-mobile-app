@@ -17,6 +17,7 @@ import { NavigationContext } from "../navigation/NavigationContext";
 import { checkSubmissionStatus, SubmissionStatusResponse, isEvaluationComplete, isEvaluationFailed } from "../services/pucExamApi";
 import { getEvaluationResultsBySubmissionId } from "../services/answerSheetApi";
 import { saveEvaluationToHistory } from "../services/evaluationHistoryService";
+import { useTheme } from "../contexts/ThemeContext";
 import { 
   SPACING, 
   TYPOGRAPHY, 
@@ -136,8 +137,19 @@ const STATUS_CONFIG: Record<string, { icon: string; color: string; message: stri
 
 export default function LearningHub() {
   const { navigate, pendingEvaluation, setPendingEvaluation, setCompletedEvaluation, setResultsScreenData } = useContext(NavigationContext);
+  const { theme, themeMode, setThemeMode, isDark } = useTheme();
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [evaluationStatus, setEvaluationStatus] = useState<SubmissionStatusResponse | null>(null);
+
+  // Toggle between light and dark mode only
+  const toggleTheme = () => {
+    setThemeMode(themeMode === 'light' ? 'dark' : 'light');
+  };
+
+  // Get icon for current theme mode
+  const getThemeIcon = () => {
+    return themeMode === 'light' ? 'sunny' : 'moon';
+  };
 
   // Get current status config
   const getCurrentStatusConfig = () => {
@@ -293,8 +305,8 @@ export default function LearningHub() {
   ];
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <StatusBar barStyle={theme.colors.statusBar} backgroundColor={COLORS.primary} />
 
       {/* HEADER */}
       <LinearGradient
@@ -318,23 +330,33 @@ export default function LearningHub() {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={styles.chatIconButton}
-            onPress={() => navigate("chat")}
-            accessibilityLabel="Go to Chat"
-          >
-            <Ionicons name="chatbubbles-outline" size={ICON_SIZE.md} color={COLORS.textInverse} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.themeButton}
+              onPress={toggleTheme}
+              accessibilityLabel={`Switch theme. Current: ${themeMode}`}
+            >
+              <Ionicons name={getThemeIcon()} size={ICON_SIZE.md} color={COLORS.textInverse} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.chatIconButton}
+              onPress={() => navigate("chat")}
+              accessibilityLabel="Go to Chat"
+            >
+              <Ionicons name="chatbubbles-outline" size={ICON_SIZE.md} color={COLORS.textInverse} />
+            </TouchableOpacity>
+          </View>
         </View>
       </LinearGradient>
 
       <ScrollView
-        style={styles.scrollView}
+        style={[styles.scrollView, { backgroundColor: theme.colors.background }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* WELCOME CARD */}
-        <View style={styles.welcomeCard}>
+        <View style={[styles.welcomeCard, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.welcomeIconWrapper}>
             <LinearGradient
               colors={[COLORS.primary, COLORS.primaryLight]}
@@ -348,8 +370,8 @@ export default function LearningHub() {
             </LinearGradient>
           </View>
           <View style={styles.welcomeContent}>
-            <Text style={styles.welcomeTitle}>Ready to Learn?</Text>
-            <Text style={styles.welcomeText}>
+            <Text style={[styles.welcomeTitle, { color: theme.colors.text }]}>Ready to Learn?</Text>
+            <Text style={[styles.welcomeText, { color: theme.colors.textSecondary }]}>
               Explore study materials, practice questions, and exam preparation tools.
             </Text>
           </View>
@@ -402,8 +424,8 @@ export default function LearningHub() {
         {/* FEATURES SECTION */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Learning Tools</Text>
-            <Text style={styles.sectionSubtitle}>Choose what you want to do</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Learning Tools</Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textTertiary }]}>Choose what you want to do</Text>
           </View>
 
           <View style={styles.featuresGrid}>
@@ -412,6 +434,7 @@ export default function LearningHub() {
                 key={feature.id}
                 style={[
                   styles.featureCard,
+                  { backgroundColor: theme.colors.surface },
                   index % 2 === 0 ? styles.cardLeft : styles.cardRight,
                 ]}
                 onPress={feature.action}
@@ -429,10 +452,10 @@ export default function LearningHub() {
                     color={COLORS.textInverse}
                   />
                 </LinearGradient>
-                <Text style={styles.featureTitle} numberOfLines={1}>
+                <Text style={[styles.featureTitle, { color: theme.colors.text }]} numberOfLines={1}>
                   {feature.title}
                 </Text>
-                <Text style={styles.featureDescription} numberOfLines={2}>
+                <Text style={[styles.featureDescription, { color: theme.colors.textSecondary }]} numberOfLines={2}>
                   {feature.description}
                 </Text>
               </TouchableOpacity>
@@ -443,16 +466,17 @@ export default function LearningHub() {
         {/* SUBJECTS SECTION */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Browse Model Question Paper by Subject</Text>
-            <Text style={styles.sectionSubtitle}>Select a subject to practice</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Browse Model Question Paper by Subject</Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textTertiary }]}>Select a subject to practice</Text>
           </View>
 
-          <View style={styles.subjectsList}>
+          <View style={[styles.subjectsList, { backgroundColor: theme.colors.surface }]}>
             {subjects.map((subject, index) => (
               <TouchableOpacity
                 key={subject.id}
                 style={[
                   styles.subjectItem,
+                  { borderBottomColor: theme.colors.divider },
                   index === subjects.length - 1 && styles.subjectItemLast,
                 ]}
                 onPress={() => navigate("exam")}
@@ -471,8 +495,8 @@ export default function LearningHub() {
                   />
                 </View>
                 <View style={styles.subjectContent}>
-                  <Text style={styles.subjectName}>{subject.name}</Text>
-                  <Text style={styles.subjectMeta}>{subject.questions}+ questions</Text>
+                  <Text style={[styles.subjectName, { color: theme.colors.text }]}>{subject.name}</Text>
+                  <Text style={[styles.subjectMeta, { color: theme.colors.textTertiary }]}>{subject.questions}+ questions</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -480,21 +504,21 @@ export default function LearningHub() {
         </View>
 
         {/* QUICK STATS */}
-        <View style={styles.statsCard}>
+        <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>2000+</Text>
-              <Text style={styles.statLabel}>Questions</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Questions</Text>
             </View>
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.divider }]} />
             <View style={styles.statItem}>
               <Text style={styles.statValue}>6</Text>
-              <Text style={styles.statLabel}>Subjects</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Subjects</Text>
             </View>
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.divider }]} />
             <View style={styles.statItem}>
               <Text style={styles.statValue}>PUC</Text>
-              <Text style={styles.statLabel}>Board</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Board</Text>
             </View>
           </View>
         </View>
@@ -552,6 +576,14 @@ const styles = StyleSheet.create({
     ...TEXT.bodyMedium,
     color: "rgba(255, 255, 255, 0.8)",
     marginTop: SPACING.xs,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  themeButton: {
+    padding: SPACING.sm,
   },
   chatIconButton: {
     padding: SPACING.sm,
